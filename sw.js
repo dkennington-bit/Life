@@ -1,5 +1,9 @@
-const CACHE = 'primordial-v1';
-const ASSETS = ['/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js'];
+const CACHE = 'primordial-084efed'; // auto-stamped by pre-commit hook
+const ASSETS = [
+  '/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js',
+  '/Life/js/config.js', '/Life/js/grid.js', '/Life/js/particles.js',
+  '/Life/js/organism.js', '/Life/js/world.js', '/Life/js/ui.js', '/Life/js/main.js',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -14,7 +18,5 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
-  );
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
