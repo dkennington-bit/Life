@@ -1,4 +1,4 @@
-const CACHE = 'primordial-e144a6e'; // auto-stamped by pre-commit hook
+const CACHE = 'primordial-084efed'; // auto-stamped by pre-commit hook
 const ASSETS = [
   '/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js',
   '/Life/js/config.js', '/Life/js/grid.js', '/Life/js/particles.js',
