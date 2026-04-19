@@ -49,6 +49,16 @@
     text-align: center;
     letter-spacing: 2px;
   }
+  #legend {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    font-family: monospace;
+    font-size: 10px;
+    pointer-events: none;
+    line-height: 1.6;
+  }
+  #legend span { opacity: 0.75; }
 </style>
 </head>
 <body>
@@ -59,6 +69,7 @@
   <span id="time">day: 0</span>
 </div>
 <div id="era"></div>
+<div id="legend"></div>
 
 <script>
 'use strict';
@@ -66,7 +77,7 @@
 // ─── canvas setup ────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const SCALE = 2; // pixel size — bigger = chunkier pixels
+const SCALE = 2;
 let W, H, GW, GH;
 
 function resize() {
@@ -84,41 +95,54 @@ window.addEventListener('resize', resize);
 
 // ─── constants ───────────────────────────────────────────────────────────────
 const TICK = 1000 / 60;
-const MAX_POP = 200;
-const INIT_POP = 80;
-const FOOD_COUNT = 200;
+const MAX_POP = 250;
+const INIT_POP = 90;      // 15 of each species
+const FOOD_COUNT = 220;
 const EAT_RANGE = 2;
-const SPLIT_ENERGY = 160;
-const STARVE_BASE = 0.03;  // quadratic with size — big orgs burn fast
+const STARVE_BASE = 0.03;
 const FOOD_VALUE = 25;
-const KILL_VALUE = 35;     // reduced — killing is less of a windfall
+const KILL_VALUE = 35;
 const SIGHT = 40;
-const SPEED_BASE = 0.7;
 const MUTATION = 0.08;
-const MAX_SIZE = 12;       // hard biological ceiling
+const MAX_SIZE = 12;
 
-// era thresholds (avg size)
-const ERAS = [
-  { min: 0,   name: 'PRIMORDIAL SOUP',      bg: [0,0,0] },
-  { min: 3,   name: 'BACTERIAL DAWN',       bg: [0,2,0] },
-  { min: 6,   name: 'AGE OF MICROBES',      bg: [0,3,2] },
-  { min: 10,  name: 'COLONIAL EMERGENCE',   bg: [0,2,5] },
-  { min: 15,  name: 'PREDATOR ERA',         bg: [2,0,5] },
-  { min: 22,  name: 'APEX MICROBE AGE',     bg: [5,0,2] },
+// ─── species definitions ─────────────────────────────────────────────────────
+// Behaviors are class-fixed and inherited without mutation.
+// Colors match species and never drift.
+const SPECIES = [
+  // Photosynthesizer — gains energy passively, never hunts, drifts peacefully
+  { id: 0, name: 'photo',  color: [60, 180, 80],   baseSpeed: 0.45, baseSize: 2.5, splitAt: 160, metabolismMult: 1.0,  photoRate: 0.25 },
+  // Hunter — always seeks and kills prey regardless of hunger
+  { id: 1, name: 'hunter', color: [200, 120, 60],  baseSpeed: 0.85, baseSize: 4.0, splitAt: 160, metabolismMult: 1.2,  photoRate: 0    },
+  // Swimmer — fastest, flees very effectively, moderate forager
+  { id: 2, name: 'swim',   color: [80, 160, 200],  baseSpeed: 1.45, baseSize: 2.0, splitAt: 160, metabolismMult: 1.0,  photoRate: 0    },
+  // Archaea — lowest metabolism, largest, extremely tough
+  { id: 3, name: 'archaea',color: [160, 80, 180],  baseSpeed: 0.55, baseSize: 5.0, splitAt: 180, metabolismMult: 0.55, photoRate: 0    },
+  // Bloomer — tiny, weak, splits at half the usual threshold (reproduces fast)
+  { id: 4, name: 'bloom',  color: [180, 180, 60],  baseSpeed: 0.38, baseSize: 1.2, splitAt: 70,  metabolismMult: 0.8,  photoRate: 0    },
+  // Parasite — ignores food, drains energy from any other organism
+  { id: 5, name: 'para',   color: [60, 180, 160],  baseSpeed: 1.0,  baseSize: 1.8, splitAt: 140, metabolismMult: 1.1,  photoRate: 0    },
 ];
 
-// ─── food particles ───────────────────────────────────────────────────────────
-const foods = [];
+// eras advance by elapsed days
+const ERAS = [
+  { min: 0,    name: 'PRIMORDIAL SOUP',    bg: [0,0,0] },
+  { min: 30,   name: 'BACTERIAL DAWN',     bg: [0,2,0] },
+  { min: 100,  name: 'AGE OF MICROBES',    bg: [0,3,2] },
+  { min: 250,  name: 'COLONIAL EMERGENCE', bg: [0,2,5] },
+  { min: 500,  name: 'PREDATOR ERA',       bg: [2,0,5] },
+  { min: 1000, name: 'APEX MICROBE AGE',   bg: [5,0,2] },
+];
 
+// ─── food ─────────────────────────────────────────────────────────────────────
+const foods = [];
 function spawnFood(x, y) {
   foods.push({
     x: x !== undefined ? x : Math.random() * GW,
     y: y !== undefined ? y : Math.random() * GH,
     value: FOOD_VALUE,
-    age: 0
   });
 }
-
 function initFood() {
   for (let i = 0; i < FOOD_COUNT; i++) spawnFood();
 }
@@ -128,32 +152,23 @@ let nextId = 0;
 let generation = 0;
 const orgs = [];
 
-// color palette — muted, realistic, slightly bioluminescent
-const BASE_COLORS = [
-  [60, 180, 80],   // green (cyanobacteria)
-  [80, 160, 200],  // blue (gram-negative)
-  [200, 120, 60],  // amber (staph-ish)
-  [160, 80, 180],  // violet (archaea)
-  [180, 180, 60],  // yellow-green (algae)
-  [60, 180, 160],  // teal (spirochete)
-];
+function createOrg(x, y, parentDNA, forcedSpeciesId) {
+  const spId = parentDNA             ? parentDNA.speciesId
+             : forcedSpeciesId !== undefined ? forcedSpeciesId
+             : Math.floor(Math.random() * SPECIES.length);
+  const sp = SPECIES[spId];
 
-function mutateColor(color) {
-  return color.map(c => Math.max(20, Math.min(255, c + (Math.random() - 0.5) * 30 * MUTATION * 10)));
-}
-
-function createOrg(x, y, parentDNA) {
   const dna = parentDNA ? {
-    color: mutateColor(parentDNA.color),
+    speciesId: spId,
+    color: sp.color.slice(),  // color locked to species — no drift
     speed: Math.max(0.2, parentDNA.speed + (Math.random() - 0.5) * MUTATION * 2),
-    size: Math.max(1, Math.min(MAX_SIZE, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3)),
-    aggression: Math.max(0, Math.min(1, parentDNA.aggression + (Math.random() - 0.5) * MUTATION)),
+    size:  Math.max(0.8, Math.min(MAX_SIZE, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3)),
     lineage: parentDNA.lineage,
   } : {
-    color: BASE_COLORS[Math.floor(Math.random() * BASE_COLORS.length)].slice(),
-    speed: SPEED_BASE + Math.random() * 0.4,
-    size: 1 + Math.random() * 2,
-    aggression: 0.3 + Math.random() * 0.4,
+    speciesId: spId,
+    color: sp.color.slice(),
+    speed: sp.baseSpeed + (Math.random() - 0.5) * 0.2,
+    size:  Math.max(0.8, sp.baseSize + (Math.random() - 0.5) * 1.0),
     lineage: nextId,
   };
 
@@ -167,43 +182,31 @@ function createOrg(x, y, parentDNA) {
     age: 0,
     gen: generation,
     dna,
-    target: null,
-    targetType: null, // 'food' | 'prey' | null
     wanderAngle: Math.random() * Math.PI * 2,
     dead: false,
-    deathParticles: 0,
   };
 }
 
 function initOrgs() {
-  for (let i = 0; i < INIT_POP; i++) orgs.push(createOrg());
+  for (let i = 0; i < INIT_POP; i++) {
+    orgs.push(createOrg(undefined, undefined, null, i % SPECIES.length));
+  }
 }
 
-// ─── particles (death/eat effects) ───────────────────────────────────────────
+// ─── particles ───────────────────────────────────────────────────────────────
 const particles = [];
-
 function spawnParticles(x, y, color, n) {
   for (let i = 0; i < n; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 0.5 + Math.random() * 2;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 1,
-      color: color.slice(),
-    });
+    particles.push({ x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life: 1, color: color.slice() });
   }
 }
 
-// ─── spatial grid (fast neighbor lookup) ─────────────────────────────────────
+// ─── spatial grid ─────────────────────────────────────────────────────────────
 const CELL = 20;
 let grid = {};
-
-function gridKey(x, y) {
-  return (Math.floor(x / CELL) | 0) + ',' + (Math.floor(y / CELL) | 0);
-}
-
+function gridKey(x, y) { return (Math.floor(x/CELL)|0) + ',' + (Math.floor(y/CELL)|0); }
 function buildGrid() {
   grid = {};
   for (let i = 0; i < orgs.length; i++) {
@@ -214,65 +217,51 @@ function buildGrid() {
     grid[k].push(o);
   }
 }
-
 function nearby(x, y, range) {
   const result = [];
-  const cr = Math.ceil(range / CELL);
-  const cx = Math.floor(x / CELL);
-  const cy = Math.floor(y / CELL);
-  for (let dx = -cr; dx <= cr; dx++) {
+  const cr = Math.ceil(range/CELL), cx = Math.floor(x/CELL), cy = Math.floor(y/CELL);
+  for (let dx = -cr; dx <= cr; dx++)
     for (let dy = -cr; dy <= cr; dy++) {
-      const k = (cx + dx) + ',' + (cy + dy);
+      const k = (cx+dx) + ',' + (cy+dy);
       if (grid[k]) result.push(...grid[k]);
     }
-  }
   return result;
 }
 
-// ─── update logic ─────────────────────────────────────────────────────────────
-let day = 0;
-let tick = 0;
-let currentEra = 0;
-let avgSize = 1;
+// ─── update ───────────────────────────────────────────────────────────────────
+let day = 0, tick = 0;
 
 function updateOrg(o) {
   if (o.dead) return;
+  const sp = SPECIES[o.dna.speciesId];
 
   o.age++;
-  // metabolic cost scales quadratically — big cells burn energy fast (surface-area/volume law)
-  o.energy -= STARVE_BASE * (1 + o.dna.size * o.dna.size * 0.04);
+  o.energy -= STARVE_BASE * sp.metabolismMult * (1 + o.dna.size * o.dna.size * 0.04);
+  if (sp.photoRate > 0) o.energy += sp.photoRate;
 
-  // death
   if (o.energy <= 0) {
     o.dead = true;
     spawnParticles(o.x, o.y, o.dna.color, Math.ceil(o.dna.size * 2));
-    // corpse becomes food
-    for (let i = 0; i < Math.floor(o.dna.size); i++) {
+    for (let i = 0; i < Math.floor(o.dna.size); i++)
       spawnFood(o.x + (Math.random()-0.5)*4, o.y + (Math.random()-0.5)*4);
-    }
     return;
   }
 
-  // split when full
-  if (o.energy > SPLIT_ENERGY && orgs.length < MAX_POP) {
+  if (o.energy > sp.splitAt && orgs.length < MAX_POP) {
     o.energy *= 0.5;
     generation = Math.max(generation, o.gen + 1);
-    const child = createOrg(
-      o.x + (Math.random()-0.5)*4,
-      o.y + (Math.random()-0.5)*4,
-      o.dna
-    );
+    const child = createOrg(o.x + (Math.random()-0.5)*4, o.y + (Math.random()-0.5)*4, o.dna);
     child.gen = o.gen + 1;
     child.energy = o.energy;
     orgs.push(child);
     spawnParticles(o.x, o.y, o.dna.color, 3);
   }
 
-  // sense neighbors
   const neighbors = nearby(o.x, o.y, SIGHT);
   let closestFood = null, closestFoodDist = Infinity;
   let closestPrey = null, closestPreyDist = Infinity;
   let closestPredator = null, closestPredatorDist = Infinity;
+  let closestHost = null, closestHostDist = Infinity;
 
   for (let i = 0; i < neighbors.length; i++) {
     const n = neighbors[i];
@@ -281,80 +270,107 @@ function updateOrg(o) {
     const d = Math.sqrt(dx*dx + dy*dy);
     if (d > SIGHT) continue;
 
-    if (n.dna.size < o.dna.size * 0.85 && d < closestPreyDist) {
-      closestPrey = n; closestPreyDist = d;
+    if (sp.id === 5) {
+      // parasite seeks any non-parasite host
+      if (n.dna.speciesId !== 5 && d < closestHostDist) { closestHost = n; closestHostDist = d; }
+    } else {
+      // hunters use loose 95% threshold; others need a clear size advantage
+      const thresh = sp.id === 1 ? 0.95 : 0.85;
+      if (n.dna.size < o.dna.size * thresh && d < closestPreyDist) { closestPrey = n; closestPreyDist = d; }
     }
-    if (n.dna.size > o.dna.size * 1.15 && d < closestPredatorDist) {
-      closestPredator = n; closestPredatorDist = d;
-    }
+
+    if (n.dna.size > o.dna.size * 1.15 && d < closestPredatorDist) { closestPredator = n; closestPredatorDist = d; }
   }
 
-  // find nearest food
-  for (let i = 0; i < foods.length; i++) {
-    const f = foods[i];
-    const dx = f.x - o.x, dy = f.y - o.y;
-    const d = dx*dx + dy*dy;
-    if (d < closestFoodDist) { closestFood = f; closestFoodDist = d; }
+  // parasites ignore food; everyone else scans for it
+  if (sp.id !== 5) {
+    for (let i = 0; i < foods.length; i++) {
+      const f = foods[i];
+      const dx = f.x - o.x, dy = f.y - o.y;
+      const d = dx*dx + dy*dy;
+      if (d < closestFoodDist) { closestFood = f; closestFoodDist = d; }
+    }
+    closestFoodDist = Math.sqrt(closestFoodDist);
   }
-  closestFoodDist = Math.sqrt(closestFoodDist);
 
-  // decide behavior
   let ax = 0, ay = 0;
 
-  if (closestPredator && closestPredatorDist < SIGHT * 0.6) {
-    // flee
-    const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
-    const d = Math.sqrt(dx*dx + dy*dy) || 1;
-    ax = dx/d * 2; ay = dy/d * 2;
-  } else if (closestPrey && closestPreyDist < SIGHT && o.dna.aggression > 0.3) {
-    // hunt
-    const dx = closestPrey.x - o.x, dy = closestPrey.y - o.y;
-    const d = closestPreyDist || 1;
-    ax = dx/d; ay = dy/d;
-
-    // eat
-    if (closestPreyDist < EAT_RANGE + o.dna.size) {
-      closestPrey.dead = true;
-      o.energy += KILL_VALUE + closestPrey.dna.size * 4;
-      spawnParticles(closestPrey.x, closestPrey.y, closestPrey.dna.color, 6);
+  if (sp.id === 5) {
+    // ── PARASITE: pursue and drain hosts ──
+    if (closestPredator && closestPredatorDist < SIGHT * 0.5) {
+      const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
+      ax = dx/d*2; ay = dy/d*2;
+    } else if (closestHost) {
+      const dx = closestHost.x - o.x, dy = closestHost.y - o.y;
+      ax = dx/(closestHostDist||1); ay = dy/(closestHostDist||1);
+      if (closestHostDist < EAT_RANGE + o.dna.size + closestHost.dna.size * 0.5) {
+        closestHost.energy -= 0.9;
+        o.energy += 0.65;
+      }
+    } else {
+      o.wanderAngle += (Math.random()-0.5)*0.5;
+      ax = Math.cos(o.wanderAngle)*0.5; ay = Math.sin(o.wanderAngle)*0.5;
     }
-  } else if (closestFood && closestFoodDist < SIGHT) {
-    // seek food
-    const dx = closestFood.x - o.x, dy = closestFood.y - o.y;
-    const d = closestFoodDist || 1;
-    ax = dx/d; ay = dy/d;
 
-    // eat food
-    if (closestFoodDist < EAT_RANGE + o.dna.size * 0.5) {
-      o.energy += closestFood.value;
-      const idx = foods.indexOf(closestFood);
-      if (idx > -1) foods.splice(idx, 1);
-      spawnFood(); // replenish elsewhere
+  } else if (sp.id === 0) {
+    // ── PHOTOSYNTHESIZER: drift, eat food, flee — never hunts ──
+    if (closestPredator && closestPredatorDist < SIGHT * 0.7) {
+      const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
+      ax = dx/d*1.5; ay = dy/d*1.5;
+    } else if (closestFood && closestFoodDist < SIGHT) {
+      const dx = closestFood.x - o.x, dy = closestFood.y - o.y;
+      ax = dx/(closestFoodDist||1)*0.5; ay = dy/(closestFoodDist||1)*0.5;
+      if (closestFoodDist < EAT_RANGE + o.dna.size * 0.5) {
+        o.energy += closestFood.value;
+        const idx = foods.indexOf(closestFood);
+        if (idx > -1) { foods.splice(idx, 1); spawnFood(); }
+      }
+    } else {
+      o.wanderAngle += (Math.random()-0.5)*0.3;
+      ax = Math.cos(o.wanderAngle)*0.3; ay = Math.sin(o.wanderAngle)*0.3;
     }
+
   } else {
-    // wander
-    o.wanderAngle += (Math.random() - 0.5) * 0.4;
-    ax = Math.cos(o.wanderAngle) * 0.5;
-    ay = Math.sin(o.wanderAngle) * 0.5;
+    // ── STANDARD: hunter / swimmer / archaea / bloomer ──
+    const alwaysHunts = sp.id === 1;
+
+    if (closestPredator && closestPredatorDist < SIGHT * 0.6) {
+      const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
+      ax = dx/d*2; ay = dy/d*2;
+    } else if (closestPrey && (alwaysHunts || o.energy < 60)) {
+      const dx = closestPrey.x - o.x, dy = closestPrey.y - o.y;
+      ax = dx/(closestPreyDist||1); ay = dy/(closestPreyDist||1);
+      if (closestPreyDist < EAT_RANGE + o.dna.size) {
+        closestPrey.dead = true;
+        o.energy += KILL_VALUE + closestPrey.dna.size * 4 + (alwaysHunts ? 15 : 0);
+        spawnParticles(closestPrey.x, closestPrey.y, closestPrey.dna.color, 6);
+      }
+    } else if (closestFood && closestFoodDist < SIGHT) {
+      const dx = closestFood.x - o.x, dy = closestFood.y - o.y;
+      ax = dx/(closestFoodDist||1); ay = dy/(closestFoodDist||1);
+      if (closestFoodDist < EAT_RANGE + o.dna.size * 0.5) {
+        o.energy += closestFood.value;
+        const idx = foods.indexOf(closestFood);
+        if (idx > -1) { foods.splice(idx, 1); spawnFood(); }
+      }
+    } else {
+      o.wanderAngle += (Math.random()-0.5)*0.4;
+      ax = Math.cos(o.wanderAngle)*0.5; ay = Math.sin(o.wanderAngle)*0.5;
+    }
   }
 
-  // apply movement — big organisms are slower (drag/mass tradeoff)
   const spd = o.dna.speed / (1 + o.dna.size * 0.12);
-  o.vx = o.vx * 0.8 + ax * spd * 0.3;
-  o.vy = o.vy * 0.8 + ay * spd * 0.3;
-
-  // clamp speed
-  const vel = Math.sqrt(o.vx*o.vx + o.vy*o.vy);
+  o.vx = o.vx*0.8 + ax*spd*0.3;
+  o.vy = o.vy*0.8 + ay*spd*0.3;
+  const vel = Math.sqrt(o.vx*o.vx+o.vy*o.vy);
   if (vel > spd) { o.vx *= spd/vel; o.vy *= spd/vel; }
 
-  o.x += o.vx;
-  o.y += o.vy;
-
-  // wrap edges
-  if (o.x < 0) o.x += GW;
-  if (o.x >= GW) o.x -= GW;
-  if (o.y < 0) o.y += GH;
-  if (o.y >= GH) o.y -= GH;
+  o.x += o.vx; o.y += o.vy;
+  if (o.x < 0) o.x += GW;  if (o.x >= GW) o.x -= GW;
+  if (o.y < 0) o.y += GH;  if (o.y >= GH) o.y -= GH;
 }
 
 // ─── rendering ───────────────────────────────────────────────────────────────
@@ -364,38 +380,45 @@ function drawOrg(o) {
   const [r, g, b] = o.dna.color;
   const alpha = Math.min(1, o.energy / 60);
   const px = Math.round(o.x), py = Math.round(o.y);
+  const spId = o.dna.speciesId;
 
   ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${alpha.toFixed(2)})`;
 
   if (sr <= 1) {
     ctx.fillRect(px, py, 1, 1);
   } else if (sr === 2) {
-    ctx.fillRect(px - 1, py - 1, 2, 2);
+    ctx.fillRect(px-1, py-1, 2, 2);
   } else {
-    // arc is GPU-accelerated — no per-pixel loop
     ctx.beginPath();
-    ctx.arc(px, py, s, 0, Math.PI * 2);
+    ctx.arc(px, py, s, 0, Math.PI*2);
     ctx.fill();
-
-    // nucleus highlight
     if (sr >= 4) {
-      ctx.fillStyle = `rgba(${Math.min(255,r+90)|0},${Math.min(255,g+90)|0},${Math.min(255,b+90)|0},${(alpha * 0.5).toFixed(2)})`;
+      ctx.fillStyle = `rgba(${Math.min(255,r+90)|0},${Math.min(255,g+90)|0},${Math.min(255,b+90)|0},${(alpha*0.5).toFixed(2)})`;
       ctx.beginPath();
-      ctx.arc(px - sr * 0.25, py - sr * 0.25, Math.max(1, sr * 0.3), 0, Math.PI * 2);
+      ctx.arc(px-sr*0.25, py-sr*0.25, Math.max(1, sr*0.3), 0, Math.PI*2);
       ctx.fill();
     }
   }
 
-  // flagella for small fast swimmers
-  if (sr <= 3 && o.dna.speed > 0.8) {
+  // photosynthesizer: chloroplast dots
+  if (spId === 0 && sr >= 3) {
+    ctx.fillStyle = `rgba(160,255,160,${(alpha*0.6).toFixed(2)})`;
+    ctx.fillRect(px+1, py, 1, 1);
+    ctx.fillRect(px-1, py, 1, 1);
+  }
+
+  // swimmer: always show flagella; others only when small and fast
+  const showFlagella = spId === 2 || (sr <= 3 && o.dna.speed > 0.8);
+  if (showFlagella) {
     const angle = Math.atan2(o.vy, o.vx) + Math.PI;
-    ctx.strokeStyle = `rgba(${r|0},${g|0},${b|0},0.3)`;
+    const len = spId === 2 ? 3.5 : 3;
+    ctx.strokeStyle = `rgba(${r|0},${g|0},${b|0},${spId === 2 ? 0.45 : 0.3})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(px, py);
-    ctx.lineTo(px + Math.cos(angle + 0.3) * sr * 3, py + Math.sin(angle + 0.3) * sr * 3);
+    ctx.lineTo(px + Math.cos(angle+0.3)*sr*len, py + Math.sin(angle+0.3)*sr*len);
     ctx.moveTo(px, py);
-    ctx.lineTo(px + Math.cos(angle - 0.3) * sr * 2, py + Math.sin(angle - 0.3) * sr * 2);
+    ctx.lineTo(px + Math.cos(angle-0.3)*sr*(len-1), py + Math.sin(angle-0.3)*sr*(len-1));
     ctx.stroke();
   }
 }
@@ -411,7 +434,6 @@ function drawParticle(p) {
   ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
 }
 
-// background with subtle era tint
 function drawBackground(era) {
   const [br, bg, bb] = era.bg;
   ctx.fillStyle = `rgb(${br},${bg},${bb})`;
@@ -421,11 +443,10 @@ function drawBackground(era) {
 // ─── era display ──────────────────────────────────────────────────────────────
 let lastEraIdx = -1;
 const eraEl = document.getElementById('era');
-
 function checkEra() {
   let eraIdx = 0;
-  for (let i = ERAS.length - 1; i >= 0; i--) {
-    if (avgSize >= ERAS[i].min) { eraIdx = i; break; }
+  for (let i = ERAS.length-1; i >= 0; i--) {
+    if (day >= ERAS[i].min) { eraIdx = i; break; }
   }
   if (eraIdx !== lastEraIdx) {
     lastEraIdx = eraIdx;
@@ -434,6 +455,17 @@ function checkEra() {
     setTimeout(() => { eraEl.style.opacity = '0'; }, 3000);
   }
   return ERAS[eraIdx];
+}
+
+// ─── species legend ───────────────────────────────────────────────────────────
+const legendEl = document.getElementById('legend');
+function updateLegend() {
+  const counts = new Array(SPECIES.length).fill(0);
+  for (let i = 0; i < orgs.length; i++) counts[orgs[i].dna.speciesId]++;
+  legendEl.innerHTML = SPECIES.map(sp => {
+    const [r,g,b] = sp.color;
+    return `<div><span style="color:rgb(${r},${g},${b})">● ${sp.name}:${counts[sp.id]}</span></div>`;
+  }).join('');
 }
 
 // ─── main loop ────────────────────────────────────────────────────────────────
@@ -452,27 +484,18 @@ function loop(ts) {
   tick++;
   if (tick % 60 === 0) day++;
 
-  // ensure minimum population
-  if (orgs.filter(o => !o.dead).length < 20) {
-    for (let i = 0; i < 15; i++) {
-      orgs.push(createOrg(undefined, undefined,
-        orgs.find(o => !o.dead)?.dna || null
-      ));
+  // respawn with balanced species if population crashes
+  if (orgs.length < 20) {
+    for (let i = 0; i < 18; i++) {
+      orgs.push(createOrg(undefined, undefined, null, i % SPECIES.length));
     }
   }
 
   buildGrid();
-
-  // update all orgs
   for (let i = 0; i < orgs.length; i++) updateOrg(orgs[i]);
+  for (let i = orgs.length-1; i >= 0; i--) { if (orgs[i].dead) orgs.splice(i, 1); }
 
-  // remove dead
-  for (let i = orgs.length - 1; i >= 0; i--) {
-    if (orgs[i].dead) orgs.splice(i, 1);
-  }
-
-  // update particles
-  for (let i = particles.length - 1; i >= 0; i--) {
+  for (let i = particles.length-1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy;
     p.vx *= 0.9; p.vy *= 0.9;
@@ -480,39 +503,23 @@ function loop(ts) {
     if (p.life <= 0) particles.splice(i, 1);
   }
 
-  // calc avg size
-  if (tick % 30 === 0) {
-    let sum = 0, alive = 0;
-    for (let i = 0; i < orgs.length; i++) {
-      if (!orgs[i].dead) { sum += orgs[i].dna.size; alive++; }
-    }
-    avgSize = alive ? sum / alive : 1;
-  }
-
   const era = checkEra();
   drawBackground(era);
-
-  // draw food
   for (let i = 0; i < foods.length; i++) drawFood(foods[i]);
-
-  // draw particles
   for (let i = 0; i < particles.length; i++) drawParticle(particles[i]);
-
-  if (tick % 10 === 0) orgs.sort((a, b) => a.dna.size - b.dna.size);
+  if (tick % 10 === 0) orgs.sort((a,b) => a.dna.size - b.dna.size);
   for (let i = 0; i < orgs.length; i++) drawOrg(orgs[i]);
 
-  // ui update (every 30 frames)
   if (tick % 30 === 0) {
-    const alive = orgs.length;
-    popEl.textContent = `organisms: ${alive}`;
+    popEl.textContent = `organisms: ${orgs.length}`;
     genEl.textContent = `generation: ${generation}`;
     timeEl.textContent = `day: ${day}`;
+    updateLegend();
   }
 }
 
 requestAnimationFrame(loop);
 
-// register service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/Life/sw.js').catch(() => {});
 }
