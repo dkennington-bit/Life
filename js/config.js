@@ -21,6 +21,7 @@ export const TICK        = 1000 / 60;
 // venomDmg:       energy drained from victim per venom tick
 // venomGain:      energy gained by stinger per successful sting
 // stingCooldown:  ticks between stings (venom only)
+// maxAge:         ticks before natural death (0 = immortal); ±15% per-organism jitter
 export const SPECIES = [
   {
     id: 0, name: 'Photosynthesizer', color: [60, 180, 80],
@@ -28,6 +29,7 @@ export const SPECIES = [
     baseSpeed: 0.45, baseSize: 2.5, splitAt: 110, metabolismMult: 1.0,
     photoRate: 0.40, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 0, digestTime: 0,
     drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
+    maxAge: 1800,
   },
   {
     id: 1, name: 'Hunter', color: [200, 120, 60],
@@ -35,6 +37,7 @@ export const SPECIES = [
     baseSpeed: 0.9, baseSize: 4.0, splitAt: 160, metabolismMult: 1.2,
     photoRate: 0, preyRatio: 0.92, fleeThresh: 1.8, huntEnergy: 120, digestTime: 240,
     drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
+    maxAge: 2400,
   },
   {
     id: 2, name: 'Swimmer', color: [80, 160, 200],
@@ -42,6 +45,7 @@ export const SPECIES = [
     baseSpeed: 1.5, baseSize: 2.0, splitAt: 160, metabolismMult: 1.0,
     photoRate: 0, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 80, digestTime: 0,
     drainRate: 0, venomDuration: 120, venomDmg: 0.5, venomGain: 8, stingCooldown: 60,
+    maxAge: 1800,
   },
   {
     id: 3, name: 'Archaea', color: [160, 80, 180],
@@ -49,6 +53,7 @@ export const SPECIES = [
     baseSpeed: 0.55, baseSize: 5.0, splitAt: 180, metabolismMult: 0.55,
     photoRate: 0, preyRatio: 0.85, fleeThresh: 2.5, huntEnergy: 70, digestTime: 120,
     drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
+    maxAge: 4200,
   },
   {
     id: 4, name: 'Bloomer', color: [180, 180, 60],
@@ -56,6 +61,7 @@ export const SPECIES = [
     baseSpeed: 0.38, baseSize: 1.2, splitAt: 70, metabolismMult: 0.8,
     photoRate: 0, preyRatio: 0, fleeThresh: 1.1, huntEnergy: 0, digestTime: 0,
     drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
+    maxAge: 900,
   },
   {
     id: 5, name: 'Parasite', color: [60, 180, 160],
@@ -63,6 +69,7 @@ export const SPECIES = [
     baseSpeed: 1.05, baseSize: 1.8, splitAt: 140, metabolismMult: 1.1,
     photoRate: 0, preyRatio: 0, fleeThresh: 1.5, huntEnergy: 0, digestTime: 0,
     drainRate: 1.0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
+    maxAge: 2100,
   },
 ];
 
