@@ -2,7 +2,7 @@
   "name": "Primordial",
   "short_name": "Primordial",
   "description": "Watch life evolve from single-cell organisms",
-  "start_url": "/",
+  "start_url": "/Life/",
   "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#000000",

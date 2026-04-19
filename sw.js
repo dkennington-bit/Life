@@ -1,5 +1,5 @@
 const CACHE = 'primordial-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const ASSETS = ['/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
