@@ -32,6 +32,7 @@ export class Organism {
     this.vy = (Math.random() - 0.5) * 2;
     this.energy = 80 + Math.random() * 40;
     this.wanderAngle = Math.random() * Math.PI * 2;
+    this.digestTimer = 0;
     this._ax = 0;
     this._ay = 0;
   }
@@ -107,6 +108,7 @@ export class Organism {
   _kill(prey) {
     prey.dead = true;
     this.energy += KILL_VALUE + prey.dna.size * 4;
+    this.digestTimer = this.sp.digestTime ?? 0;
     this.world.particles.spawn(prey.x, prey.y, prey.dna.color, 6);
   }
 
@@ -122,6 +124,7 @@ export class Organism {
     const sp = this.sp;
 
     this.age++;
+    if (this.digestTimer > 0) this.digestTimer--;
     this.energy -= STARVE_BASE * sp.metabolismMult * (1 + this.dna.size * this.dna.size * 0.04);
     if (sp.photoRate > 0) this.energy += sp.photoRate;
 
@@ -247,7 +250,7 @@ export class Hunter extends Organism {
     const sp = this.sp;
     if (nearThreat && nearThreatDist < SIGHT * 0.45) {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist);
-    } else if (nearPrey && this.energy < sp.huntEnergy) {
+    } else if (nearPrey && this.energy < sp.huntEnergy && this.digestTimer === 0) {
       this._toward(nearPrey.x, nearPrey.y, nearPreyDist, 1.3);
       if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
     } else if (nearFood && nearFoodDist < SIGHT) {
@@ -291,7 +294,7 @@ export class Archaea extends Organism {
     const sp = this.sp;
     if (nearThreat && nearThreatDist < SIGHT * 0.3) {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist);
-    } else if (nearPrey && this.energy < sp.huntEnergy) {
+    } else if (nearPrey && this.energy < sp.huntEnergy && this.digestTimer === 0) {
       this._toward(nearPrey.x, nearPrey.y, nearPreyDist);
       if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
     } else if (nearFood && nearFoodDist < SIGHT) {
