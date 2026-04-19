@@ -11,55 +11,75 @@ export const MAX_SIZE    = 12;
 export const TICK        = 1000 / 60;
 
 // All fields are live — sliders write directly here each tick.
-// preyRatio:    can hunt things up to this fraction of own size (0 = never hunts)
-// fleeThresh:   flee when threat is THIS MUCH bigger than self (1.8 = flee if 80% bigger)
-// huntEnergy:   only hunt when own energy is below this (999 = always hunt)
-// digestTime:   ticks after a kill before the predator can hunt again (enforces hunger cycle)
-// drainRate:    energy/tick drained from host (parasite only)
+// attackType:     'none' | 'direct' | 'venom' | 'parasite'
+// preyRatio:      direct predators hunt things up to this fraction of own size (0 = never)
+// fleeThresh:     flee when direct-attacker is THIS MUCH bigger than self
+// huntEnergy:     only hunt/sting when own energy is below this (999 = always)
+// digestTime:     ticks after a kill before predator can hunt again
+// drainRate:      energy/tick drained from host (parasite only)
+// venomDuration:  ticks venom lasts on victim (venom only)
+// venomDmg:       energy drained from victim per venom tick
+// venomGain:      energy gained by stinger per successful sting
+// stingCooldown:  ticks between stings (venom only)
 export const SPECIES = [
   {
     id: 0, name: 'Photosynthesizer', color: [60, 180, 80],
+    attackType: 'none',
     baseSpeed: 0.45, baseSize: 2.5, splitAt: 160, metabolismMult: 1.0,
-    photoRate: 0.25, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 0, digestTime: 0, drainRate: 0,
+    photoRate: 0.25, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 0, digestTime: 0,
+    drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
   {
     id: 1, name: 'Hunter', color: [200, 120, 60],
+    attackType: 'direct',
     baseSpeed: 0.9, baseSize: 4.0, splitAt: 160, metabolismMult: 1.2,
-    photoRate: 0, preyRatio: 0.92, fleeThresh: 1.8, huntEnergy: 120, digestTime: 240, drainRate: 0,
+    photoRate: 0, preyRatio: 0.92, fleeThresh: 1.8, huntEnergy: 120, digestTime: 240,
+    drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
   {
     id: 2, name: 'Swimmer', color: [80, 160, 200],
+    attackType: 'venom',
     baseSpeed: 1.5, baseSize: 2.0, splitAt: 160, metabolismMult: 1.0,
-    photoRate: 0, preyRatio: 0.8, fleeThresh: 1.15, huntEnergy: 50, digestTime: 0, drainRate: 0,
+    photoRate: 0, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 80, digestTime: 0,
+    drainRate: 0, venomDuration: 120, venomDmg: 0.5, venomGain: 8, stingCooldown: 60,
   },
   {
     id: 3, name: 'Archaea', color: [160, 80, 180],
+    attackType: 'direct',
     baseSpeed: 0.55, baseSize: 5.0, splitAt: 180, metabolismMult: 0.55,
-    photoRate: 0, preyRatio: 0.85, fleeThresh: 2.5, huntEnergy: 70, digestTime: 120, drainRate: 0,
+    photoRate: 0, preyRatio: 0.85, fleeThresh: 2.5, huntEnergy: 70, digestTime: 120,
+    drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
   {
     id: 4, name: 'Bloomer', color: [180, 180, 60],
+    attackType: 'none',
     baseSpeed: 0.38, baseSize: 1.2, splitAt: 70, metabolismMult: 0.8,
-    photoRate: 0, preyRatio: 0, fleeThresh: 1.1, huntEnergy: 0, digestTime: 0, drainRate: 0,
+    photoRate: 0, preyRatio: 0, fleeThresh: 1.1, huntEnergy: 0, digestTime: 0,
+    drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
   {
     id: 5, name: 'Parasite', color: [60, 180, 160],
+    attackType: 'parasite',
     baseSpeed: 1.05, baseSize: 1.8, splitAt: 140, metabolismMult: 1.1,
-    photoRate: 0, preyRatio: 0, fleeThresh: 1.5, huntEnergy: 0, digestTime: 0, drainRate: 1.0,
+    photoRate: 0, preyRatio: 0, fleeThresh: 1.5, huntEnergy: 0, digestTime: 0,
+    drainRate: 1.0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
 ];
 
 export const SLIDER_CONFIG = [
-  { key: 'baseSpeed',      label: 'speed',       min: 0.1, max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
-  { key: 'baseSize',       label: 'size',        min: 0.5, max: 12,   step: 0.1,  fmt: v => v.toFixed(1)  },
-  { key: 'splitAt',        label: 'split at',    min: 30,  max: 400,  step: 5,    fmt: v => v | 0         },
-  { key: 'metabolismMult', label: 'metabolism',  min: 0.1, max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
-  { key: 'photoRate',      label: 'photo rate',  min: 0,   max: 2.0,  step: 0.05, fmt: v => v.toFixed(2) },
-  { key: 'fleeThresh',     label: 'flee thresh', min: 1.0, max: 4.0,  step: 0.05, fmt: v => v.toFixed(2) },
-  { key: 'preyRatio',      label: 'prey ratio',  min: 0,   max: 1.5,  step: 0.05, fmt: v => v.toFixed(2) },
-  { key: 'huntEnergy',     label: 'hunt energy', min: 0,   max: 999,  step: 10,   fmt: v => v >= 999 ? '∞' : v | 0 },
-  { key: 'digestTime',     label: 'digest ticks',min: 0,   max: 600,  step: 10,   fmt: v => v | 0 },
-  { key: 'drainRate',      label: 'drain rate',  min: 0,   max: 5.0,  step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: 'baseSpeed',      label: 'speed',          min: 0.1, max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'baseSize',       label: 'size',            min: 0.5, max: 12,   step: 0.1,  fmt: v => v.toFixed(1)  },
+  { key: 'splitAt',        label: 'split at',        min: 30,  max: 400,  step: 5,    fmt: v => v | 0         },
+  { key: 'metabolismMult', label: 'metabolism',      min: 0.1, max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'photoRate',      label: 'photo rate',      min: 0,   max: 2.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'fleeThresh',     label: 'flee thresh',     min: 1.0, max: 4.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'preyRatio',      label: 'prey ratio',      min: 0,   max: 1.5,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'huntEnergy',     label: 'hunt energy',     min: 0,   max: 999,  step: 10,   fmt: v => v >= 999 ? '∞' : v | 0 },
+  { key: 'digestTime',     label: 'digest ticks',    min: 0,   max: 600,  step: 10,   fmt: v => v | 0 },
+  { key: 'drainRate',      label: 'drain rate',      min: 0,   max: 5.0,  step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: 'venomDuration',  label: 'venom duration',  min: 0,   max: 300,  step: 10,   fmt: v => v | 0 },
+  { key: 'venomDmg',       label: 'venom dmg/tick',  min: 0,   max: 3.0,  step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: 'venomGain',      label: 'venom energy',    min: 0,   max: 40,   step: 1,    fmt: v => v | 0 },
 ];
 
 export const ERAS = [

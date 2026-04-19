@@ -1,8 +1,19 @@
-const CACHE = 'primordial-e7b2249'; // auto-stamped by pre-commit hook
+const CACHE = 'primordial-de68bcf'; // auto-stamped by pre-commit hook
 const ASSETS = [
   '/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js',
   '/Life/js/config.js', '/Life/js/grid.js', '/Life/js/particles.js',
   '/Life/js/organism.js', '/Life/js/world.js', '/Life/js/ui.js', '/Life/js/main.js',
+  '/Life/js/behaviors/PeacefulBehavior.js',
+  '/Life/js/behaviors/PredatorBehavior.js',
+  '/Life/js/behaviors/VenomBehavior.js',
+  '/Life/js/behaviors/ParasiteBehavior.js',
+  '/Life/js/species/index.js',
+  '/Life/js/species/Photosynthesizer.js',
+  '/Life/js/species/Hunter.js',
+  '/Life/js/species/Swimmer.js',
+  '/Life/js/species/Archaea.js',
+  '/Life/js/species/Bloomer.js',
+  '/Life/js/species/Parasite.js',
 ];
 
 self.addEventListener('install', e => {

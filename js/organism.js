@@ -2,7 +2,6 @@ import { SPECIES, EAT_RANGE, SIGHT, STARVE_BASE, MUTATION, MAX_SIZE, KILL_VALUE 
 
 let _nextId = 0;
 
-// ─── Base Organism ────────────────────────────────────────────────────────────
 export class Organism {
   constructor(world, x, y, parentDNA, spId) {
     this.world = world;
@@ -30,18 +29,24 @@ export class Organism {
     this.y  = y  ?? Math.random() * world.gh;
     this.vx = (Math.random() - 0.5) * 2;
     this.vy = (Math.random() - 0.5) * 2;
-    this.energy = 80 + Math.random() * 40;
-    this.wanderAngle = Math.random() * Math.PI * 2;
-    this.digestTimer = 0;
+    this.energy       = 80 + Math.random() * 40;
+    this.wanderAngle  = Math.random() * Math.PI * 2;
+    this.digestTimer  = 0;
+    this.venomTimer   = 0;
+    this.venomDmg     = 0;
+    this.stingCooldown = 0;
     this._ax = 0;
     this._ay = 0;
   }
 
   get sp() { return SPECIES[this.dna.speciesId]; }
 
-  // ── shared sensing ────────────────────────────────────────────────────────
+  // Override in behavior subclasses
+  canAttack(_other) { return false; }
+  isHost(_other)    { return false; }
+
+  // ── sensing ───────────────────────────────────────────────────────────────
   sense(neighbors) {
-    const sp = this.sp;
     let nearFood = null, nearFoodDist2 = Infinity;
     let nearPrey = null, nearPreyDist  = Infinity;
     let nearThreat = null, nearThreatDist = Infinity;
@@ -54,13 +59,11 @@ export class Organism {
       if (d > SIGHT) continue;
 
       if (this._threatens(n) && d < nearThreatDist) { nearThreat = n; nearThreatDist = d; }
-      if (sp.preyRatio > 0 && n.dna.size < this.dna.size * sp.preyRatio && d < nearPreyDist) {
-        nearPrey = n; nearPreyDist = d;
-      }
-      if (sp.id === 5 && n.dna.speciesId !== 5 && d < nearHostDist) { nearHost = n; nearHostDist = d; }
+      if (this.canAttack(n)  && d < nearPreyDist)   { nearPrey   = n; nearPreyDist   = d; }
+      if (this.isHost(n)     && d < nearHostDist)   { nearHost   = n; nearHostDist   = d; }
     }
 
-    if (sp.id !== 5) {
+    if (this.sp.attackType !== 'parasite') {
       for (const f of this.world.foods) {
         const dx = f.x - this.x, dy = f.y - this.y;
         const d2 = dx * dx + dy * dy;
@@ -69,20 +72,25 @@ export class Organism {
     }
 
     return {
-      nearFood, nearFoodDist: nearFood ? Math.sqrt(nearFoodDist2) : Infinity,
-      nearPrey, nearPreyDist,
+      nearFood,   nearFoodDist:   nearFood   ? Math.sqrt(nearFoodDist2) : Infinity,
+      nearPrey,   nearPreyDist,
       nearThreat, nearThreatDist,
-      nearHost, nearHostDist,
+      nearHost,   nearHostDist,
     };
   }
 
-  // Parasites threaten small/medium organisms (size < 3.5) but not large ones —
-  // hunters and archaea are big enough to ignore parasites (and eat them instead).
-  // Otherwise: threat = anything bigger than self * fleeThresh.
+  // Determines whether `other` is a threat to this organism based on other's attack type.
+  // 'direct':  flee if other is significantly larger (fleeThresh multiplier)
+  // 'venom':   flee if other is more than half your own size (can catch and sting you)
+  // 'parasite': flee if you're small enough to be drained (size < 3.5)
   _threatens(other) {
-    if (other.dna.speciesId === 5 && this.dna.speciesId !== 5)
-      return this.dna.size < 3.5;
-    return other.dna.size > this.dna.size * this.sp.fleeThresh;
+    const at = other.sp.attackType;
+    if (!at || at === 'none')  return false;
+    if (at === 'direct')       return other.dna.size > this.dna.size * this.sp.fleeThresh;
+    if (at === 'venom')        return this.dna.size < other.dna.size * 2.0
+                                   && other.dna.speciesId !== this.dna.speciesId;
+    if (at === 'parasite')     return this.dna.size < 3.5;
+    return false;
   }
 
   // ── movement helpers ──────────────────────────────────────────────────────
@@ -124,7 +132,10 @@ export class Organism {
     const sp = this.sp;
 
     this.age++;
-    if (this.digestTimer > 0) this.digestTimer--;
+    if (this.digestTimer   > 0) this.digestTimer--;
+    if (this.stingCooldown > 0) this.stingCooldown--;
+    if (this.venomTimer    > 0) { this.energy -= this.venomDmg; this.venomTimer--; }
+
     this.energy -= STARVE_BASE * sp.metabolismMult * (1 + this.dna.size * this.dna.size * 0.04);
     if (sp.photoRate > 0) this.energy += sp.photoRate;
 
@@ -163,7 +174,11 @@ export class Organism {
   _split() {
     this.energy *= 0.5;
     this.world.generation = Math.max(this.world.generation, this.gen + 1);
-    const child = spawnOrg(this.world, this.x + (Math.random() - 0.5) * 4, this.y + (Math.random() - 0.5) * 4, this.dna);
+    const child = this.world.spawnOrg(
+      this.x + (Math.random() - 0.5) * 4,
+      this.y + (Math.random() - 0.5) * 4,
+      this.dna
+    );
     child.gen    = this.gen + 1;
     child.energy = this.energy;
     this.world.orgs.push(child);
@@ -185,7 +200,10 @@ export class Organism {
     const alpha = Math.min(1, this.energy / 60);
     const px = Math.round(this.x), py = Math.round(this.y);
 
-    ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(2)})`;
+    // Venom victim pulses slightly dimmer
+    const a = this.venomTimer > 0 ? alpha * 0.65 : alpha;
+
+    ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${a.toFixed(2)})`;
     if (sr <= 1) {
       ctx.fillRect(px, py, 1, 1);
     } else if (sr === 2) {
@@ -193,14 +211,13 @@ export class Organism {
     } else {
       ctx.beginPath(); ctx.arc(px, py, s, 0, Math.PI * 2); ctx.fill();
       if (sr >= 4) {
-        ctx.fillStyle = `rgba(${Math.min(255, r + 90) | 0},${Math.min(255, g + 90) | 0},${Math.min(255, b + 90) | 0},${(alpha * 0.5).toFixed(2)})`;
+        ctx.fillStyle = `rgba(${Math.min(255, r + 90) | 0},${Math.min(255, g + 90) | 0},${Math.min(255, b + 90) | 0},${(a * 0.5).toFixed(2)})`;
         ctx.beginPath(); ctx.arc(px - sr * 0.25, py - sr * 0.25, Math.max(1, sr * 0.3), 0, Math.PI * 2); ctx.fill();
       }
     }
 
-    // flagella for any small fast non-swimmer
     if (sr <= 3 && this.dna.speed > 0.9 && this.dna.speciesId !== 2) {
-      this._drawFlagella(ctx, sr, r, g, b, alpha, 3, 0.3);
+      this._drawFlagella(ctx, sr, r, g, b, a, 3, 0.3);
     }
   }
 
@@ -216,167 +233,4 @@ export class Organism {
     ctx.lineTo(px + Math.cos(angle - 0.3) * sr * (lenMult - 1), py + Math.sin(angle - 0.3) * sr * (lenMult - 1));
     ctx.stroke();
   }
-}
-
-// ─── Photosynthesizer ────────────────────────────────────────────────────────
-export class Photosynthesizer extends Organism {
-  _behavior({ nearFood, nearFoodDist, nearThreat, nearThreatDist }) {
-    if (nearThreat && nearThreatDist < SIGHT * 0.7) {
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist, 1.5);
-    } else if (nearFood && nearFoodDist < SIGHT) {
-      this._toward(nearFood.x, nearFood.y, nearFoodDist, 0.5);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
-    } else {
-      this._wander(0.25);
-    }
-  }
-
-  draw(ctx) {
-    super.draw(ctx);
-    const sr = Math.round(this.dna.size);
-    if (sr >= 3) {
-      const alpha = Math.min(1, this.energy / 60);
-      ctx.fillStyle = `rgba(160,255,160,${(alpha * 0.65).toFixed(2)})`;
-      const px = Math.round(this.x), py = Math.round(this.y);
-      ctx.fillRect(px + 1, py, 1, 1);
-      ctx.fillRect(px - 1, py, 1, 1);
-    }
-  }
-}
-
-// ─── Hunter ──────────────────────────────────────────────────────────────────
-export class Hunter extends Organism {
-  _behavior({ nearFood, nearFoodDist, nearPrey, nearPreyDist, nearThreat, nearThreatDist }) {
-    const sp = this.sp;
-    if (nearThreat && nearThreatDist < SIGHT * 0.45) {
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist);
-    } else if (nearPrey && this.energy < sp.huntEnergy && this.digestTimer === 0) {
-      this._toward(nearPrey.x, nearPrey.y, nearPreyDist, 1.3);
-      if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
-    } else if (nearFood && nearFoodDist < SIGHT) {
-      this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
-    } else {
-      this._wander();
-    }
-  }
-}
-
-// ─── Swimmer ─────────────────────────────────────────────────────────────────
-export class Swimmer extends Organism {
-  _behavior({ nearFood, nearFoodDist, nearPrey, nearPreyDist, nearThreat, nearThreatDist }) {
-    const sp = this.sp;
-    if (nearThreat && nearThreatDist < SIGHT * 0.8) {
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist, 2.5);
-    } else if (nearPrey && this.energy < sp.huntEnergy) {
-      this._toward(nearPrey.x, nearPrey.y, nearPreyDist);
-      if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
-    } else if (nearFood && nearFoodDist < SIGHT) {
-      this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
-    } else {
-      this._wander(0.5);
-    }
-  }
-
-  draw(ctx) {
-    super.draw(ctx);
-    const sr = Math.round(this.dna.size);
-    const [r, g, b] = this.dna.color;
-    const alpha = Math.min(1, this.energy / 60);
-    this._drawFlagella(ctx, sr, r, g, b, alpha, 3.5, 0.45);
-  }
-}
-
-// ─── Archaea ─────────────────────────────────────────────────────────────────
-export class Archaea extends Organism {
-  _behavior({ nearFood, nearFoodDist, nearPrey, nearPreyDist, nearThreat, nearThreatDist }) {
-    const sp = this.sp;
-    if (nearThreat && nearThreatDist < SIGHT * 0.3) {
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist);
-    } else if (nearPrey && this.energy < sp.huntEnergy && this.digestTimer === 0) {
-      this._toward(nearPrey.x, nearPrey.y, nearPreyDist);
-      if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
-    } else if (nearFood && nearFoodDist < SIGHT) {
-      this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
-    } else {
-      this._wander(0.2);
-    }
-  }
-}
-
-// ─── Bloomer ─────────────────────────────────────────────────────────────────
-export class Bloomer extends Organism {
-  _behavior({ nearFood, nearFoodDist, nearThreat, nearThreatDist }) {
-    if (nearThreat && nearThreatDist < SIGHT * 0.9) {
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist, 2);
-    } else if (nearFood && nearFoodDist < SIGHT) {
-      this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
-    } else {
-      this._wander(0.5);
-    }
-  }
-}
-
-// ─── Parasite ─────────────────────────────────────────────────────────────────
-export class Parasite extends Organism {
-  constructor(...args) {
-    super(...args);
-    this.host = null;
-  }
-
-  _behavior({ nearHost, nearHostDist, nearThreat, nearThreatDist }) {
-    const sp = this.sp;
-
-    if (nearThreat && nearThreatDist < SIGHT * 0.5) {
-      this.host = null;
-      this._away(nearThreat.x, nearThreat.y, nearThreatDist);
-      return;
-    }
-
-    if (nearHost) {
-      this._toward(nearHost.x, nearHost.y, nearHostDist, 1.2);
-      const attachDist = EAT_RANGE + this.dna.size + nearHost.dna.size * 0.5;
-      if (nearHostDist < attachDist) {
-        this.host = nearHost;
-        nearHost.energy -= sp.drainRate;
-        this.energy    += sp.drainRate * 0.65;
-        // parasitic drag on host
-        nearHost.vx *= 0.9;
-        nearHost.vy *= 0.9;
-      } else {
-        this.host = null;
-      }
-    } else {
-      this.host = null;
-      this._wander(0.5);
-    }
-  }
-
-  draw(ctx) {
-    // draw tendril to host before drawing self (so self renders on top)
-    if (this.host && !this.host.dead) {
-      const [r, g, b] = this.dna.color;
-      const alpha = Math.min(1, this.energy / 60) * 0.55;
-      ctx.strokeStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(2)})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(this.x), Math.round(this.y));
-      ctx.lineTo(Math.round(this.host.x), Math.round(this.host.y));
-      ctx.stroke();
-    }
-    super.draw(ctx);
-  }
-}
-
-// ─── Factory ──────────────────────────────────────────────────────────────────
-const _CLASSES = [Photosynthesizer, Hunter, Swimmer, Archaea, Bloomer, Parasite];
-
-export function spawnOrg(world, x, y, parentDNA, forcedSpeciesId) {
-  const spId = parentDNA != null        ? parentDNA.speciesId
-             : forcedSpeciesId != null  ? forcedSpeciesId
-             : Math.floor(Math.random() * SPECIES.length);
-  return new _CLASSES[spId](world, x, y, parentDNA, spId);
 }
