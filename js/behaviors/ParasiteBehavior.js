@@ -39,14 +39,20 @@ export class ParasiteBehavior extends Organism {
 
   draw(ctx) {
     if (this.host && !this.host.dead) {
-      const [r, g, b] = this.dna.color;
-      const alpha = Math.min(1, this.energy / 60) * 0.55;
-      ctx.strokeStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(2)})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(Math.round(this.x), Math.round(this.y));
-      ctx.lineTo(Math.round(this.host.x), Math.round(this.host.y));
-      ctx.stroke();
+      // Skip tendril if host wrapped to the other side — otherwise the line
+      // spans the entire screen.
+      const dx = Math.abs(this.host.x - this.x);
+      const dy = Math.abs(this.host.y - this.y);
+      if (dx < this.world.gw * 0.45 && dy < this.world.gh * 0.45) {
+        const [r, g, b] = this.dna.color;
+        const alpha = Math.min(1, this.energy / 60) * 0.55;
+        ctx.strokeStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(2)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(this.x), Math.round(this.y));
+        ctx.lineTo(Math.round(this.host.x), Math.round(this.host.y));
+        ctx.stroke();
+      }
     }
     super.draw(ctx);
   }

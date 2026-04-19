@@ -167,8 +167,13 @@ export class Organism {
     if (vel > spd) { this.vx *= spd / vel; this.vy *= spd / vel; }
     this.x += this.vx; this.y += this.vy;
     const { gw, gh } = this.world;
-    if (this.x < 0) this.x += gw; else if (this.x >= gw) this.x -= gw;
-    if (this.y < 0) this.y += gh; else if (this.y >= gh) this.y -= gh;
+    // Wrap with a small off-screen margin so organisms slip past the edge
+    // before re-emerging, avoiding a hard teleport at the visible boundary.
+    const M = 10;
+    if (this.x > gw + M) this.x -= gw + M * 2;
+    else if (this.x < -M) this.x += gw + M * 2;
+    if (this.y > gh + M) this.y -= gh + M * 2;
+    else if (this.y < -M) this.y += gh + M * 2;
   }
 
   _split() {
