@@ -25,8 +25,8 @@ export const SPECIES = [
   {
     id: 0, name: 'Photosynthesizer', color: [60, 180, 80],
     attackType: 'none',
-    baseSpeed: 0.45, baseSize: 2.5, splitAt: 160, metabolismMult: 1.0,
-    photoRate: 0.25, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 0, digestTime: 0,
+    baseSpeed: 0.45, baseSize: 2.5, splitAt: 110, metabolismMult: 1.0,
+    photoRate: 0.40, preyRatio: 0, fleeThresh: 1.15, huntEnergy: 0, digestTime: 0,
     drainRate: 0, venomDuration: 0, venomDmg: 0, venomGain: 0, stingCooldown: 0,
   },
   {
