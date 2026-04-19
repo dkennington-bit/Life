@@ -62,7 +62,7 @@ export class UI {
       val.className   = 'slider-val';
       val.textContent = cfg.fmt(sp[cfg.key] ?? 0);
 
-      inp.addEventListener('input', () => {
+      const onSlide = () => {
         const v = parseFloat(inp.value);
         SPECIES[spId][cfg.key] = v;
         val.textContent = cfg.fmt(v);
@@ -76,7 +76,10 @@ export class UI {
           for (const o of this.world.orgs)
             if (o.dna.speciesId === spId) o.dna.size = v;
         }
-      });
+      };
+      // 'input' fires during drag on modern browsers; 'change' covers older iOS
+      inp.addEventListener('input',  onSlide);
+      inp.addEventListener('change', onSlide);
 
       row.appendChild(lbl);
       row.appendChild(inp);

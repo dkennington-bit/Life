@@ -75,10 +75,12 @@ export class Organism {
     };
   }
 
-  // Parasites always threaten non-parasites regardless of size.
+  // Parasites threaten small/medium organisms (size < 3.5) but not large ones —
+  // hunters and archaea are big enough to ignore parasites (and eat them instead).
   // Otherwise: threat = anything bigger than self * fleeThresh.
   _threatens(other) {
-    if (other.dna.speciesId === 5 && this.dna.speciesId !== 5) return true;
+    if (other.dna.speciesId === 5 && this.dna.speciesId !== 5)
+      return this.dna.size < 3.5;
     return other.dna.size > this.dna.size * this.sp.fleeThresh;
   }
 
