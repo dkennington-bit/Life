@@ -3,7 +3,7 @@ import { World } from './world.js';
 import { UI }    from './ui.js';
 
 // Updated by pre-commit hook — change on every push confirms fresh deploy.
-const BUILD_COMMIT = 'f9e3a7d';
+const BUILD_COMMIT = 'e144a6e';
 document.getElementById('commit').textContent = BUILD_COMMIT;
 
 // ── canvas ────────────────────────────────────────────────────────────────────
