@@ -17,8 +17,8 @@ export class Photosynthesizer extends PeacefulBehavior {
     super.draw(ctx);
     const sr = Math.round(this.dna.size);
     if (sr >= 3) {
-      const alpha = Math.min(1, this.energy / 60);
-      ctx.fillStyle = `rgba(160,255,160,${(alpha * 0.65).toFixed(2)})`;
+      const dim = this._vitality;
+      ctx.fillStyle = `rgba(${(160*dim)|0},${(255*dim)|0},${(160*dim)|0},0.65)`;
       const px = Math.round(this.x), py = Math.round(this.y);
       ctx.fillRect(px + 1, py, 1, 1);
       ctx.fillRect(px - 1, py, 1, 1);

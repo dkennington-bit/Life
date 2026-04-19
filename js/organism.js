@@ -37,9 +37,22 @@ export class Organism {
     this.stingCooldown = 0;
     this._ax = 0;
     this._ay = 0;
+    const ma = this.sp.maxAge;
+    this.maxAge = ma > 0 ? Math.round(ma * (0.85 + Math.random() * 0.3)) : Infinity;
   }
 
   get sp() { return SPECIES[this.dna.speciesId]; }
+
+  // 1.0 = fully healthy, fades toward 0.15 as energy runs low or age nears maxAge.
+  // Drives color darkening in draw().
+  get _vitality() {
+    const ev = Math.min(1, this.energy / 60);
+    const av = this.maxAge < Infinity
+      ? Math.min(1, (this.maxAge - this.age) / (this.maxAge * 0.25))
+      : 1;
+    const vv = this.venomTimer > 0 ? 0.7 : 1.0;
+    return Math.max(0.15, Math.min(ev, av) * vv);
+  }
 
   // Override in behavior subclasses
   canAttack(_other) { return false; }
@@ -132,6 +145,7 @@ export class Organism {
     const sp = this.sp;
 
     this.age++;
+    if (this.age >= this.maxAge) { this.die(); return; }
     if (this.digestTimer   > 0) this.digestTimer--;
     if (this.stingCooldown > 0) this.stingCooldown--;
     if (this.venomTimer    > 0) { this.energy -= this.venomDmg; this.venomTimer--; }
@@ -202,13 +216,12 @@ export class Organism {
     const s  = Math.max(1, this.dna.size);
     const sr = Math.round(s);
     const [r, g, b] = this.dna.color;
-    const alpha = Math.min(1, this.energy / 60);
+    const dim = this._vitality;
     const px = Math.round(this.x), py = Math.round(this.y);
 
-    // Venom victim pulses slightly dimmer
-    const a = this.venomTimer > 0 ? alpha * 0.65 : alpha;
+    const dr = (r * dim) | 0, dg = (g * dim) | 0, db = (b * dim) | 0;
 
-    ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${a.toFixed(2)})`;
+    ctx.fillStyle = `rgba(${dr},${dg},${db},1)`;
     if (sr <= 1) {
       ctx.fillRect(px, py, 1, 1);
     } else if (sr === 2) {
@@ -216,20 +229,20 @@ export class Organism {
     } else {
       ctx.beginPath(); ctx.arc(px, py, s, 0, Math.PI * 2); ctx.fill();
       if (sr >= 4) {
-        ctx.fillStyle = `rgba(${Math.min(255, r + 90) | 0},${Math.min(255, g + 90) | 0},${Math.min(255, b + 90) | 0},${(a * 0.5).toFixed(2)})`;
+        ctx.fillStyle = `rgba(${Math.min(255, dr + 70) | 0},${Math.min(255, dg + 70) | 0},${Math.min(255, db + 70) | 0},0.5)`;
         ctx.beginPath(); ctx.arc(px - sr * 0.25, py - sr * 0.25, Math.max(1, sr * 0.3), 0, Math.PI * 2); ctx.fill();
       }
     }
 
     if (sr <= 3 && this.dna.speed > 0.9 && this.dna.speciesId !== 2) {
-      this._drawFlagella(ctx, sr, r, g, b, a, 3, 0.3);
+      this._drawFlagella(ctx, sr, r, g, b, dim, 3, 0.3);
     }
   }
 
-  _drawFlagella(ctx, sr, r, g, b, alpha, lenMult, opacity) {
+  _drawFlagella(ctx, sr, r, g, b, dim, lenMult, opacity) {
     const angle = Math.atan2(this.vy, this.vx) + Math.PI;
     const px = Math.round(this.x), py = Math.round(this.y);
-    ctx.strokeStyle = `rgba(${r | 0},${g | 0},${b | 0},${opacity})`;
+    ctx.strokeStyle = `rgba(${(r*dim)|0},${(g*dim)|0},${(b*dim)|0},${opacity})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(px, py);
