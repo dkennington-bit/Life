@@ -84,17 +84,18 @@ window.addEventListener('resize', resize);
 
 // ─── constants ───────────────────────────────────────────────────────────────
 const TICK = 1000 / 60;
-const MAX_POP = 300;
+const MAX_POP = 200;
 const INIT_POP = 80;
 const FOOD_COUNT = 200;
-const EAT_RANGE = 2;       // pixel distance to eat
-const SPLIT_ENERGY = 200;
-const STARVE_RATE = 0.04;
-const FOOD_VALUE = 30;
-const KILL_VALUE = 80;
-const SIGHT = 40;          // how far they can sense
-const SPEED_BASE = 0.6;
+const EAT_RANGE = 2;
+const SPLIT_ENERGY = 160;
+const STARVE_BASE = 0.03;  // quadratic with size — big orgs burn fast
+const FOOD_VALUE = 25;
+const KILL_VALUE = 35;     // reduced — killing is less of a windfall
+const SIGHT = 40;
+const SPEED_BASE = 0.7;
 const MUTATION = 0.08;
+const MAX_SIZE = 12;       // hard biological ceiling
 
 // era thresholds (avg size)
 const ERAS = [
@@ -145,7 +146,7 @@ function createOrg(x, y, parentDNA) {
   const dna = parentDNA ? {
     color: mutateColor(parentDNA.color),
     speed: Math.max(0.2, parentDNA.speed + (Math.random() - 0.5) * MUTATION * 2),
-    size: Math.max(1, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3),
+    size: Math.max(1, Math.min(MAX_SIZE, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3)),
     aggression: Math.max(0, Math.min(1, parentDNA.aggression + (Math.random() - 0.5) * MUTATION)),
     lineage: parentDNA.lineage,
   } : {
@@ -238,7 +239,8 @@ function updateOrg(o) {
   if (o.dead) return;
 
   o.age++;
-  o.energy -= STARVE_RATE * (1 + o.dna.size * 0.1);
+  // metabolic cost scales quadratically — big cells burn energy fast (surface-area/volume law)
+  o.energy -= STARVE_BASE * (1 + o.dna.size * o.dna.size * 0.04);
 
   // death
   if (o.energy <= 0) {
@@ -313,8 +315,7 @@ function updateOrg(o) {
     // eat
     if (closestPreyDist < EAT_RANGE + o.dna.size) {
       closestPrey.dead = true;
-      o.energy += KILL_VALUE * closestPrey.dna.size;
-      o.dna.size = Math.min(30, o.dna.size + closestPrey.dna.size * 0.05);
+      o.energy += KILL_VALUE + closestPrey.dna.size * 4;
       spawnParticles(closestPrey.x, closestPrey.y, closestPrey.dna.color, 6);
     }
   } else if (closestFood && closestFoodDist < SIGHT) {
@@ -337,8 +338,8 @@ function updateOrg(o) {
     ay = Math.sin(o.wanderAngle) * 0.5;
   }
 
-  // apply movement
-  const spd = o.dna.speed * (1 + o.dna.size * 0.05);
+  // apply movement — big organisms are slower (drag/mass tradeoff)
+  const spd = o.dna.speed / (1 + o.dna.size * 0.12);
   o.vx = o.vx * 0.8 + ax * spd * 0.3;
   o.vy = o.vy * 0.8 + ay * spd * 0.3;
 
@@ -358,53 +359,43 @@ function updateOrg(o) {
 
 // ─── rendering ───────────────────────────────────────────────────────────────
 function drawOrg(o) {
-  const s = Math.max(1, Math.round(o.dna.size));
+  const s = Math.max(1, o.dna.size);
+  const sr = Math.round(s);
   const [r, g, b] = o.dna.color;
   const alpha = Math.min(1, o.energy / 60);
+  const px = Math.round(o.x), py = Math.round(o.y);
 
-  // body pixels
   ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${alpha.toFixed(2)})`;
 
-  if (s === 1) {
-    ctx.fillRect(Math.round(o.x), Math.round(o.y), 1, 1);
-  } else if (s === 2) {
-    ctx.fillRect(Math.round(o.x)-1, Math.round(o.y)-1, 2, 2);
+  if (sr <= 1) {
+    ctx.fillRect(px, py, 1, 1);
+  } else if (sr === 2) {
+    ctx.fillRect(px - 1, py - 1, 2, 2);
   } else {
-    // pixel blob shape
-    const px = Math.round(o.x);
-    const py = Math.round(o.y);
-    const r2 = s * s;
-    for (let dy = -s; dy <= s; dy++) {
-      for (let dx = -s; dx <= s; dx++) {
-        if (dx*dx + dy*dy <= r2 * 0.75) {
-          ctx.fillRect(px+dx, py+dy, 1, 1);
-        }
-      }
-    }
-    // inner highlight (nucleus-like)
-    if (s >= 4) {
-      ctx.fillStyle = `rgba(${Math.min(255,r+80)|0},${Math.min(255,g+80)|0},${Math.min(255,b+80)|0},${(alpha*0.6).toFixed(2)})`;
-      ctx.fillRect(px-1, py-1, 2, 2);
+    // arc is GPU-accelerated — no per-pixel loop
+    ctx.beginPath();
+    ctx.arc(px, py, s, 0, Math.PI * 2);
+    ctx.fill();
+
+    // nucleus highlight
+    if (sr >= 4) {
+      ctx.fillStyle = `rgba(${Math.min(255,r+90)|0},${Math.min(255,g+90)|0},${Math.min(255,b+90)|0},${(alpha * 0.5).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(px - sr * 0.25, py - sr * 0.25, Math.max(1, sr * 0.3), 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
-  // flagella for fast small ones
-  if (s <= 3 && o.dna.speed > 0.8) {
+  // flagella for small fast swimmers
+  if (sr <= 3 && o.dna.speed > 0.8) {
     const angle = Math.atan2(o.vy, o.vx) + Math.PI;
     ctx.strokeStyle = `rgba(${r|0},${g|0},${b|0},0.3)`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    const px = Math.round(o.x), py = Math.round(o.y);
     ctx.moveTo(px, py);
-    ctx.lineTo(
-      px + Math.cos(angle + 0.3) * s * 3,
-      py + Math.sin(angle + 0.3) * s * 3
-    );
+    ctx.lineTo(px + Math.cos(angle + 0.3) * sr * 3, py + Math.sin(angle + 0.3) * sr * 3);
     ctx.moveTo(px, py);
-    ctx.lineTo(
-      px + Math.cos(angle - 0.3) * s * 2,
-      py + Math.sin(angle - 0.3) * s * 2
-    );
+    ctx.lineTo(px + Math.cos(angle - 0.3) * sr * 2, py + Math.sin(angle - 0.3) * sr * 2);
     ctx.stroke();
   }
 }
@@ -507,8 +498,7 @@ function loop(ts) {
   // draw particles
   for (let i = 0; i < particles.length; i++) drawParticle(particles[i]);
 
-  // draw orgs (smaller ones first so big ones appear on top)
-  orgs.sort((a, b) => a.dna.size - b.dna.size);
+  if (tick % 10 === 0) orgs.sort((a, b) => a.dna.size - b.dna.size);
   for (let i = 0; i < orgs.length; i++) drawOrg(orgs[i]);
 
   // ui update (every 30 frames)
