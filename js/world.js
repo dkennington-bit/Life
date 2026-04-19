@@ -1,7 +1,7 @@
 import { SPECIES, INIT_POP, FOOD_COUNT, FOOD_VALUE, MAX_POP, SIGHT } from './config.js';
 import { SpatialGrid } from './grid.js';
 import { Particles }   from './particles.js';
-import { spawnOrg }    from './organism.js';
+import { spawnOrg as spawnOrgFactory } from './species/index.js';
 
 export class World {
   constructor(gw, gh) {
@@ -19,10 +19,14 @@ export class World {
     this.generation = 0;
   }
 
+  spawnOrg(x, y, parentDNA, forcedSpeciesId) {
+    return spawnOrgFactory(this, x, y, parentDNA, forcedSpeciesId);
+  }
+
   init() {
     for (let i = 0; i < FOOD_COUNT; i++) this.spawnFood();
     for (let i = 0; i < INIT_POP; i++)
-      this.orgs.push(spawnOrg(this, undefined, undefined, null, i % SPECIES.length));
+      this.orgs.push(this.spawnOrg(undefined, undefined, null, i % SPECIES.length));
   }
 
   spawnFood(x, y) {
@@ -37,10 +41,9 @@ export class World {
     this.tick++;
     if (this.tick % 60 === 0) this.day++;
 
-    // emergency respawn with balanced species mix
     if (this.orgs.length < 20) {
       for (let i = 0; i < 18; i++)
-        this.orgs.push(spawnOrg(this, undefined, undefined, null, i % SPECIES.length));
+        this.orgs.push(this.spawnOrg(undefined, undefined, null, i % SPECIES.length));
     }
 
     this.grid.rebuild(this.orgs);
@@ -61,7 +64,6 @@ export class World {
 
     this.particles.draw(ctx);
 
-    // draw small orgs first so large ones appear on top
     if (this.tick % 10 === 0) this.orgs.sort((a, b) => a.dna.size - b.dna.size);
     for (const o of this.orgs) o.draw(ctx);
   }
