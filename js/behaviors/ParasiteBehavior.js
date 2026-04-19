@@ -21,7 +21,7 @@ export class ParasiteBehavior extends Organism {
 
     if (nearHost) {
       this._toward(nearHost.x, nearHost.y, nearHostDist, 1.2);
-      const attachDist = EAT_RANGE + this.dna.size + nearHost.dna.size * 0.5;
+      const attachDist = EAT_RANGE + this.size + nearHost.size * 0.5;
       if (nearHostDist < attachDist) {
         this.host = nearHost;
         nearHost.energy -= sp.drainRate;
