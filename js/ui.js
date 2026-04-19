@@ -6,7 +6,6 @@ export class UI {
     this._lastEraIdx = -1;
 
     this._popEl    = document.getElementById('pop');
-    this._genEl    = document.getElementById('gen');
     this._timeEl   = document.getElementById('time');
     this._eraEl    = document.getElementById('era');
     this._legendEl = document.getElementById('legend');
@@ -105,7 +104,6 @@ export class UI {
   update() {
     if (this.world.tick % 30 !== 0) return;
     this._popEl.textContent  = `organisms: ${this.world.orgs.length}`;
-    this._genEl.textContent  = `generation: ${this.world.generation}`;
     this._timeEl.textContent = `day: ${this.world.day}`;
 
     const counts = this.world.speciesCounts();
