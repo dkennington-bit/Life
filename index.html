@@ -35,9 +35,20 @@
     flex-wrap: wrap;
   }
   #ui span { opacity: 0.7; }
+  #commit {
+    position: fixed;
+    top: 0; right: 0;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 9px;
+    color: #3a3;
+    opacity: 0.45;
+    pointer-events: none;
+    letter-spacing: 0.5px;
+  }
   #era {
     position: fixed;
-    bottom: 20px;
+    bottom: 60px;
     left: 50%;
     transform: translateX(-50%);
     font-family: monospace;
@@ -59,6 +70,100 @@
     line-height: 1.6;
   }
   #legend span { opacity: 0.75; }
+
+  /* ── controller toggle button ── */
+  #ctrl-toggle {
+    position: fixed;
+    bottom: 18px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    background: rgba(0,20,0,0.75);
+    border: 1px solid rgba(60,160,60,0.35);
+    border-radius: 50%;
+    color: #5c5;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 20;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #ctrl-toggle.active {
+    background: rgba(0,60,0,0.85);
+    border-color: rgba(60,200,60,0.6);
+    color: #7e7;
+  }
+
+  /* ── controller panel ── */
+  #ctrl-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(3,10,3,0.96);
+    border-top: 1px solid rgba(60,160,60,0.3);
+    padding: 14px 16px 28px;
+    padding-bottom: max(28px, env(safe-area-inset-bottom, 28px));
+    z-index: 19;
+    font-family: monospace;
+    font-size: 11px;
+    color: #5c5;
+    transform: translateY(100%);
+    transition: transform 0.22s ease;
+  }
+  #ctrl-panel.open { transform: translateY(0); }
+
+  #ctrl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    letter-spacing: 1.5px;
+    font-size: 10px;
+    opacity: 0.6;
+    text-transform: uppercase;
+  }
+
+  #species-select {
+    width: 100%;
+    background: rgba(0,25,0,0.85);
+    color: #6d6;
+    border: 1px solid rgba(60,160,60,0.3);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 9px;
+  }
+  .slider-label {
+    width: 82px;
+    opacity: 0.65;
+    font-size: 10px;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    height: 2px;
+    accent-color: #5c5;
+    cursor: pointer;
+  }
+  .slider-val {
+    width: 38px;
+    text-align: right;
+    font-size: 11px;
+    opacity: 0.9;
+  }
 </style>
 </head>
 <body>
@@ -68,11 +173,27 @@
   <span id="gen">generation: 0</span>
   <span id="time">day: 0</span>
 </div>
+<div id="commit"></div>
 <div id="era"></div>
 <div id="legend"></div>
 
+<button id="ctrl-toggle" title="Species editor">⚙</button>
+<div id="ctrl-panel">
+  <div id="ctrl-header">
+    <span>species editor</span>
+    <span id="ctrl-note" style="font-size:9px;opacity:0.4">speed/size affect new orgs</span>
+  </div>
+  <select id="species-select"></select>
+  <div id="sliders"></div>
+</div>
+
 <script>
 'use strict';
+
+// ─── build stamp ─────────────────────────────────────────────────────────────
+// Updated automatically on each commit by the deploy flow.
+const BUILD_COMMIT = '10dc0f8';
+document.getElementById('commit').textContent = BUILD_COMMIT;
 
 // ─── canvas setup ────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
@@ -96,7 +217,7 @@ window.addEventListener('resize', resize);
 // ─── constants ───────────────────────────────────────────────────────────────
 const TICK = 1000 / 60;
 const MAX_POP = 250;
-const INIT_POP = 90;      // 15 of each species
+const INIT_POP = 90;
 const FOOD_COUNT = 220;
 const EAT_RANGE = 2;
 const STARVE_BASE = 0.03;
@@ -107,24 +228,28 @@ const MUTATION = 0.08;
 const MAX_SIZE = 12;
 
 // ─── species definitions ─────────────────────────────────────────────────────
-// Behaviors are class-fixed and inherited without mutation.
-// Colors match species and never drift.
+// All fields are live — sliders write directly into this array.
+// metabolismMult, splitAt, photoRate take effect immediately on all orgs.
+// baseSpeed, baseSize affect newly-spawned organisms only.
 const SPECIES = [
-  // Photosynthesizer — gains energy passively, never hunts, drifts peacefully
-  { id: 0, name: 'photo',  color: [60, 180, 80],   baseSpeed: 0.45, baseSize: 2.5, splitAt: 160, metabolismMult: 1.0,  photoRate: 0.25 },
-  // Hunter — always seeks and kills prey regardless of hunger
-  { id: 1, name: 'hunter', color: [200, 120, 60],  baseSpeed: 0.85, baseSize: 4.0, splitAt: 160, metabolismMult: 1.2,  photoRate: 0    },
-  // Swimmer — fastest, flees very effectively, moderate forager
-  { id: 2, name: 'swim',   color: [80, 160, 200],  baseSpeed: 1.45, baseSize: 2.0, splitAt: 160, metabolismMult: 1.0,  photoRate: 0    },
-  // Archaea — lowest metabolism, largest, extremely tough
-  { id: 3, name: 'archaea',color: [160, 80, 180],  baseSpeed: 0.55, baseSize: 5.0, splitAt: 180, metabolismMult: 0.55, photoRate: 0    },
-  // Bloomer — tiny, weak, splits at half the usual threshold (reproduces fast)
-  { id: 4, name: 'bloom',  color: [180, 180, 60],  baseSpeed: 0.38, baseSize: 1.2, splitAt: 70,  metabolismMult: 0.8,  photoRate: 0    },
-  // Parasite — ignores food, drains energy from any other organism
-  { id: 5, name: 'para',   color: [60, 180, 160],  baseSpeed: 1.0,  baseSize: 1.8, splitAt: 140, metabolismMult: 1.1,  photoRate: 0    },
+  { id: 0, name: 'Photosynthesizer', color: [60, 180, 80],   baseSpeed: 0.45, baseSize: 2.5, splitAt: 160, metabolismMult: 1.0,  photoRate: 0.25 },
+  { id: 1, name: 'Hunter',           color: [200, 120, 60],  baseSpeed: 0.85, baseSize: 4.0, splitAt: 160, metabolismMult: 1.2,  photoRate: 0    },
+  { id: 2, name: 'Swimmer',          color: [80, 160, 200],  baseSpeed: 1.45, baseSize: 2.0, splitAt: 160, metabolismMult: 1.0,  photoRate: 0    },
+  { id: 3, name: 'Archaea',          color: [160, 80, 180],  baseSpeed: 0.55, baseSize: 5.0, splitAt: 180, metabolismMult: 0.55, photoRate: 0    },
+  { id: 4, name: 'Bloomer',          color: [180, 180, 60],  baseSpeed: 0.38, baseSize: 1.2, splitAt: 70,  metabolismMult: 0.8,  photoRate: 0    },
+  { id: 5, name: 'Parasite',         color: [60, 180, 160],  baseSpeed: 1.0,  baseSize: 1.8, splitAt: 140, metabolismMult: 1.1,  photoRate: 0    },
 ];
 
-// eras advance by elapsed days
+// ─── slider config ────────────────────────────────────────────────────────────
+const SLIDER_CONFIG = [
+  { key: 'baseSpeed',      label: 'speed',       min: 0.1,  max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'baseSize',       label: 'base size',   min: 0.5,  max: 12,   step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: 'splitAt',        label: 'split at',    min: 30,   max: 400,  step: 5,    fmt: v => Math.round(v) },
+  { key: 'metabolismMult', label: 'metabolism',  min: 0.1,  max: 3.0,  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: 'photoRate',      label: 'photo rate',  min: 0,    max: 2.0,  step: 0.05, fmt: v => v.toFixed(2) },
+];
+
+// ─── eras (advance by day) ────────────────────────────────────────────────────
 const ERAS = [
   { min: 0,    name: 'PRIMORDIAL SOUP',    bg: [0,0,0] },
   { min: 30,   name: 'BACTERIAL DAWN',     bg: [0,2,0] },
@@ -153,14 +278,14 @@ let generation = 0;
 const orgs = [];
 
 function createOrg(x, y, parentDNA, forcedSpeciesId) {
-  const spId = parentDNA             ? parentDNA.speciesId
+  const spId = parentDNA                    ? parentDNA.speciesId
              : forcedSpeciesId !== undefined ? forcedSpeciesId
              : Math.floor(Math.random() * SPECIES.length);
   const sp = SPECIES[spId];
 
   const dna = parentDNA ? {
     speciesId: spId,
-    color: sp.color.slice(),  // color locked to species — no drift
+    color: sp.color.slice(),
     speed: Math.max(0.2, parentDNA.speed + (Math.random() - 0.5) * MUTATION * 2),
     size:  Math.max(0.8, Math.min(MAX_SIZE, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3)),
     lineage: parentDNA.lineage,
@@ -271,18 +396,14 @@ function updateOrg(o) {
     if (d > SIGHT) continue;
 
     if (sp.id === 5) {
-      // parasite seeks any non-parasite host
       if (n.dna.speciesId !== 5 && d < closestHostDist) { closestHost = n; closestHostDist = d; }
     } else {
-      // hunters use loose 95% threshold; others need a clear size advantage
       const thresh = sp.id === 1 ? 0.95 : 0.85;
       if (n.dna.size < o.dna.size * thresh && d < closestPreyDist) { closestPrey = n; closestPreyDist = d; }
     }
-
     if (n.dna.size > o.dna.size * 1.15 && d < closestPredatorDist) { closestPredator = n; closestPredatorDist = d; }
   }
 
-  // parasites ignore food; everyone else scans for it
   if (sp.id !== 5) {
     for (let i = 0; i < foods.length; i++) {
       const f = foods[i];
@@ -296,7 +417,7 @@ function updateOrg(o) {
   let ax = 0, ay = 0;
 
   if (sp.id === 5) {
-    // ── PARASITE: pursue and drain hosts ──
+    // PARASITE: pursue and drain hosts
     if (closestPredator && closestPredatorDist < SIGHT * 0.5) {
       const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
       const d = Math.sqrt(dx*dx+dy*dy) || 1;
@@ -314,7 +435,7 @@ function updateOrg(o) {
     }
 
   } else if (sp.id === 0) {
-    // ── PHOTOSYNTHESIZER: drift, eat food, flee — never hunts ──
+    // PHOTOSYNTHESIZER: drift, eat food, flee — never hunts
     if (closestPredator && closestPredatorDist < SIGHT * 0.7) {
       const dx = o.x - closestPredator.x, dy = o.y - closestPredator.y;
       const d = Math.sqrt(dx*dx+dy*dy) || 1;
@@ -333,7 +454,7 @@ function updateOrg(o) {
     }
 
   } else {
-    // ── STANDARD: hunter / swimmer / archaea / bloomer ──
+    // STANDARD: hunter / swimmer / archaea / bloomer
     const alwaysHunts = sp.id === 1;
 
     if (closestPredator && closestPredatorDist < SIGHT * 0.6) {
@@ -400,14 +521,12 @@ function drawOrg(o) {
     }
   }
 
-  // photosynthesizer: chloroplast dots
   if (spId === 0 && sr >= 3) {
     ctx.fillStyle = `rgba(160,255,160,${(alpha*0.6).toFixed(2)})`;
     ctx.fillRect(px+1, py, 1, 1);
     ctx.fillRect(px-1, py, 1, 1);
   }
 
-  // swimmer: always show flagella; others only when small and fast
   const showFlagella = spId === 2 || (sr <= 3 && o.dna.speed > 0.8);
   if (showFlagella) {
     const angle = Math.atan2(o.vy, o.vx) + Math.PI;
@@ -464,9 +583,70 @@ function updateLegend() {
   for (let i = 0; i < orgs.length; i++) counts[orgs[i].dna.speciesId]++;
   legendEl.innerHTML = SPECIES.map(sp => {
     const [r,g,b] = sp.color;
-    return `<div><span style="color:rgb(${r},${g},${b})">● ${sp.name}:${counts[sp.id]}</span></div>`;
+    return `<div><span style="color:rgb(${r},${g},${b})">● ${sp.name.toLowerCase()}:${counts[sp.id]}</span></div>`;
   }).join('');
 }
+
+// ─── species controller ───────────────────────────────────────────────────────
+const ctrlPanel   = document.getElementById('ctrl-panel');
+const ctrlToggle  = document.getElementById('ctrl-toggle');
+const speciesSel  = document.getElementById('species-select');
+const slidersEl   = document.getElementById('sliders');
+
+// populate dropdown
+SPECIES.forEach(sp => {
+  const opt = document.createElement('option');
+  opt.value = sp.id;
+  const [r,g,b] = sp.color;
+  opt.textContent = `${sp.name}`;
+  speciesSel.appendChild(opt);
+});
+
+function buildSliders(spId) {
+  const sp = SPECIES[spId];
+  slidersEl.innerHTML = '';
+  SLIDER_CONFIG.forEach(cfg => {
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+
+    const label = document.createElement('div');
+    label.className = 'slider-label';
+    label.textContent = cfg.label;
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = cfg.min;
+    slider.max = cfg.max;
+    slider.step = cfg.step;
+    slider.value = sp[cfg.key];
+
+    const val = document.createElement('div');
+    val.className = 'slider-val';
+    val.textContent = cfg.fmt(sp[cfg.key]);
+
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      SPECIES[spId][cfg.key] = v;
+      val.textContent = cfg.fmt(v);
+    });
+
+    row.appendChild(label);
+    row.appendChild(slider);
+    row.appendChild(val);
+    slidersEl.appendChild(row);
+  });
+}
+
+speciesSel.addEventListener('change', () => buildSliders(parseInt(speciesSel.value)));
+
+ctrlToggle.addEventListener('click', () => {
+  const open = ctrlPanel.classList.toggle('open');
+  ctrlToggle.classList.toggle('active', open);
+  if (open) buildSliders(parseInt(speciesSel.value));
+});
+
+// disable canvas touch-action while panel is open so sliders scroll
+ctrlPanel.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 
 // ─── main loop ────────────────────────────────────────────────────────────────
 let lastTime = 0;
@@ -484,7 +664,6 @@ function loop(ts) {
   tick++;
   if (tick % 60 === 0) day++;
 
-  // respawn with balanced species if population crashes
   if (orgs.length < 20) {
     for (let i = 0; i < 18; i++) {
       orgs.push(createOrg(undefined, undefined, null, i % SPECIES.length));
