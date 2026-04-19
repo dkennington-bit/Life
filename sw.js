@@ -1,4 +1,4 @@
-const CACHE = 'primordial-v1';
+const CACHE = 'primordial-ea34969'; // auto-stamped by pre-commit hook
 const ASSETS = ['/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js'];
 
 self.addEventListener('install', e => {
