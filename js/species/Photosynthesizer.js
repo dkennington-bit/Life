@@ -7,7 +7,7 @@ export class Photosynthesizer extends PeacefulBehavior {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist, 1.5);
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist, 0.5);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander(0.25);
     }
@@ -15,7 +15,7 @@ export class Photosynthesizer extends PeacefulBehavior {
 
   draw(ctx) {
     super.draw(ctx);
-    const sr = Math.round(this.dna.size);
+    const sr = Math.round(this.size);
     if (sr >= 3) {
       const dim = this._vitality;
       ctx.fillStyle = `rgba(${(160*dim)|0},${(255*dim)|0},${(160*dim)|0},0.65)`;

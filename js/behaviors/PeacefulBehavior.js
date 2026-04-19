@@ -9,7 +9,7 @@ export class PeacefulBehavior extends Organism {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist, 1.5);
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist, 0.8);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander();
     }

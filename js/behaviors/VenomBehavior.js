@@ -5,7 +5,7 @@ export class VenomBehavior extends Organism {
   // Can sting any non-same-species organism up to ~1.8x own size (hit-and-run)
   canAttack(other) {
     return other.dna.speciesId !== this.dna.speciesId
-        && other.dna.size < this.dna.size * 1.8;
+        && other.size < this.size * 1.8;
   }
 
   _sting(prey) {
@@ -34,12 +34,12 @@ export class VenomBehavior extends Organism {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist, 2.5);
     } else if (nearPrey && this.energy < sp.huntEnergy) {
       this._toward(nearPrey.x, nearPrey.y, nearPreyDist, 1.5);
-      if (nearPreyDist < EAT_RANGE + this.dna.size + nearPrey.dna.size * 0.3) {
+      if (nearPreyDist < EAT_RANGE + this.size + nearPrey.size * 0.3) {
         this._sting(nearPrey);
       }
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander(0.5);
     }

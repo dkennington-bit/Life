@@ -8,10 +8,10 @@ export class Archaea extends PredatorBehavior {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist);
     } else if (nearPrey && this.energy < sp.huntEnergy && this.digestTimer === 0) {
       this._toward(nearPrey.x, nearPrey.y, nearPreyDist);
-      if (nearPreyDist < EAT_RANGE + this.dna.size) this._kill(nearPrey);
+      if (nearPreyDist < EAT_RANGE + this.size) this._kill(nearPrey);
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander(0.2);
     }

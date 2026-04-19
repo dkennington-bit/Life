@@ -7,7 +7,7 @@ export class Bloomer extends PeacefulBehavior {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist, 2);
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander(0.5);
     }

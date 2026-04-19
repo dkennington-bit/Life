@@ -37,6 +37,9 @@ export class Organism {
     this.stingCooldown = 0;
     this._ax = 0;
     this._ay = 0;
+    // Newborns start at 40% of genetic target size and grow to full size.
+    // Initial world spawns start at full size so the sim looks populated immediately.
+    this.size = Math.max(0.5, parentDNA ? this.dna.size * 0.4 : this.dna.size);
     const ma = this.sp.maxAge;
     this.maxAge = ma > 0 ? Math.round(ma * (0.85 + Math.random() * 0.3)) : Infinity;
   }
@@ -92,17 +95,17 @@ export class Organism {
     };
   }
 
-  // Determines whether `other` is a threat to this organism based on other's attack type.
+  // Flee logic based on attacker's attack type using current live sizes.
   // 'direct':  flee if other is significantly larger (fleeThresh multiplier)
-  // 'venom':   flee if other is more than half your own size (can catch and sting you)
-  // 'parasite': flee if you're small enough to be drained (size < 3.5)
+  // 'venom':   flee if other is more than half your own size
+  // 'parasite': flee if still small enough to be drained
   _threatens(other) {
     const at = other.sp.attackType;
     if (!at || at === 'none')  return false;
-    if (at === 'direct')       return other.dna.size > this.dna.size * this.sp.fleeThresh;
-    if (at === 'venom')        return this.dna.size < other.dna.size * 2.0
+    if (at === 'direct')       return other.size > this.size * this.sp.fleeThresh;
+    if (at === 'venom')        return this.size < other.size * 2.0
                                    && other.dna.speciesId !== this.dna.speciesId;
-    if (at === 'parasite')     return this.dna.size < 3.5;
+    if (at === 'parasite')     return this.size < 3.5;
     return false;
   }
 
@@ -128,7 +131,7 @@ export class Organism {
   // ── actions ───────────────────────────────────────────────────────────────
   _kill(prey) {
     prey.dead = true;
-    this.energy += KILL_VALUE + prey.dna.size * 4;
+    this.energy += KILL_VALUE + prey.size * 4;
     this.digestTimer = this.sp.digestTime ?? 0;
     this.world.particles.spawn(prey.x, prey.y, prey.dna.color, 6);
   }
@@ -150,7 +153,12 @@ export class Organism {
     if (this.stingCooldown > 0) this.stingCooldown--;
     if (this.venomTimer    > 0) { this.energy -= this.venomDmg; this.venomTimer--; }
 
-    this.energy -= STARVE_BASE * sp.metabolismMult * (1 + this.dna.size * this.dna.size * 0.04);
+    // Grow toward genetic target size; slider reductions snap immediately.
+    if (this.size < this.dna.size)      this.size = Math.min(this.dna.size, this.size + 0.012);
+    else if (this.size > this.dna.size) this.size = this.dna.size;
+
+    // Metabolism scales with current (live) size so juveniles burn less energy.
+    this.energy -= STARVE_BASE * sp.metabolismMult * (1 + this.size * this.size * 0.04);
     if (sp.photoRate > 0) this.energy += sp.photoRate;
 
     if (this.energy <= 0) { this.die(); return; }
@@ -167,14 +175,15 @@ export class Organism {
       this._away(nearThreat.x, nearThreat.y, nearThreatDist);
     } else if (nearFood && nearFoodDist < SIGHT) {
       this._toward(nearFood.x, nearFood.y, nearFoodDist);
-      if (nearFoodDist < EAT_RANGE + this.dna.size * 0.5) this._eatFood(nearFood);
+      if (nearFoodDist < EAT_RANGE + this.size * 0.5) this._eatFood(nearFood);
     } else {
       this._wander();
     }
   }
 
   _move() {
-    const spd = this.dna.speed / (1 + this.dna.size * 0.12);
+    // Juveniles are faster relative to their size until fully grown.
+    const spd = this.dna.speed / (1 + this.size * 0.12);
     this.vx = this.vx * 0.8 + this._ax * spd * 0.3;
     this.vy = this.vy * 0.8 + this._ay * spd * 0.3;
     const vel = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
@@ -206,14 +215,14 @@ export class Organism {
 
   die() {
     this.dead = true;
-    this.world.particles.spawn(this.x, this.y, this.dna.color, Math.ceil(this.dna.size * 2));
-    for (let i = 0; i < Math.floor(this.dna.size); i++)
+    this.world.particles.spawn(this.x, this.y, this.dna.color, Math.ceil(this.size * 2));
+    for (let i = 0; i < Math.floor(this.size); i++)
       this.world.spawnFood(this.x + (Math.random() - 0.5) * 4, this.y + (Math.random() - 0.5) * 4);
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
   draw(ctx) {
-    const s  = Math.max(1, this.dna.size);
+    const s  = Math.max(1, this.size);
     const sr = Math.round(s);
     const [r, g, b] = this.dna.color;
     const dim = this._vitality;
