@@ -1,4 +1,4 @@
-import { SPECIES, INIT_POP, FOOD_COUNT, FOOD_VALUE, MAX_POP, SIGHT } from './config.js';
+import { SPECIES, INIT_POP, FOOD_COUNT, FOOD_VALUE, MAX_POP, SIGHT, disabledSpecies } from './config.js';
 import { SpatialGrid } from './grid.js';
 import { Particles }   from './particles.js';
 import { spawnOrg as spawnOrgFactory } from './species/index.js';
@@ -25,8 +25,11 @@ export class World {
 
   init() {
     for (let i = 0; i < FOOD_COUNT; i++) this.spawnFood();
-    for (let i = 0; i < INIT_POP; i++)
-      this.orgs.push(this.spawnOrg(undefined, undefined, null, i % SPECIES.length));
+    for (let i = 0; i < INIT_POP; i++) {
+      const spId = i % SPECIES.length;
+      if (!disabledSpecies.has(spId))
+        this.orgs.push(this.spawnOrg(undefined, undefined, null, spId));
+    }
   }
 
   spawnFood(x, y) {
@@ -42,8 +45,11 @@ export class World {
     if (this.tick % 60 === 0) this.day++;
 
     if (this.orgs.length < 20) {
-      for (let i = 0; i < 18; i++)
-        this.orgs.push(this.spawnOrg(undefined, undefined, null, i % SPECIES.length));
+      for (let i = 0; i < 18; i++) {
+        const spId = i % SPECIES.length;
+        if (!disabledSpecies.has(spId))
+          this.orgs.push(this.spawnOrg(undefined, undefined, null, spId));
+      }
     }
 
     this.grid.rebuild(this.orgs);

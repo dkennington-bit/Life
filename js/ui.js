@@ -1,4 +1,4 @@
-import { SPECIES, SLIDER_CONFIG, ERAS } from './config.js';
+import { SPECIES, SLIDER_CONFIG, ERAS, disabledSpecies } from './config.js';
 
 export class UI {
   constructor(world) {
@@ -14,9 +14,12 @@ export class UI {
     this._sel      = document.getElementById('species-select');
     this._sliders  = document.getElementById('sliders');
 
+    this._lastCounts = new Array(SPECIES.length).fill(0);
+
     this._populateDropdown();
     this._bindToggle();
     this._bindHardRefresh();
+    this._bindLegendToggle();
   }
 
   _populateDropdown() {
@@ -31,12 +34,44 @@ export class UI {
 
   _bindHardRefresh() {
     document.getElementById('hard-refresh').addEventListener('click', async () => {
+      localStorage.removeItem('primordial_disabled');
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map(k => caches.delete(k)));
       }
       location.reload(true);
     });
+  }
+
+  _bindLegendToggle() {
+    this._legendEl.addEventListener('click', e => {
+      const btn = e.target.closest('.sp-toggle');
+      if (!btn) return;
+      const spId = +btn.dataset.spid;
+      if (disabledSpecies.has(spId)) {
+        disabledSpecies.delete(spId);
+        for (let i = 0; i < 3; i++)
+          this.world.orgs.push(this.world.spawnOrg(undefined, undefined, null, spId));
+      } else {
+        disabledSpecies.add(spId);
+        for (const o of this.world.orgs)
+          if (o.dna.speciesId === spId) o.dead = true;
+      }
+      localStorage.setItem('primordial_disabled', JSON.stringify([...disabledSpecies]));
+      this._renderLegend(this._lastCounts);
+    });
+  }
+
+  _renderLegend(counts) {
+    this._lastCounts = counts;
+    this._legendEl.innerHTML = SPECIES.map(sp => {
+      const [r, g, b] = sp.color;
+      const off = disabledSpecies.has(sp.id);
+      return `<div class="legend-row">` +
+        `<button class="sp-toggle" data-spid="${sp.id}" title="Toggle ${sp.name}">${off ? '○' : '◉'}</button>` +
+        `<span style="color:rgb(${r},${g},${b});opacity:${off ? 0.3 : 0.75}">● ${sp.name.toLowerCase()}:${counts[sp.id]}</span>` +
+        `</div>`;
+    }).join('');
   }
 
   _bindToggle() {
@@ -118,9 +153,6 @@ export class UI {
     this._timeEl.textContent = `day: ${this.world.day}`;
 
     const counts = this.world.speciesCounts();
-    this._legendEl.innerHTML = SPECIES.map(sp => {
-      const [r, g, b] = sp.color;
-      return `<div><span style="color:rgb(${r},${g},${b})">● ${sp.name.toLowerCase()}:${counts[sp.id]}</span></div>`;
-    }).join('');
+    this._renderLegend(counts);
   }
 }

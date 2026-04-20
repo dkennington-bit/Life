@@ -89,6 +89,10 @@ export const SLIDER_CONFIG = [
   { key: 'venomGain',      label: 'venom energy',    min: 0,   max: 40,   step: 1,    fmt: v => v | 0 },
 ];
 
+export const disabledSpecies = new Set(
+  JSON.parse(localStorage.getItem('primordial_disabled') || '[]')
+);
+
 export const ERAS = [
   { min: 0,    name: 'PRIMORDIAL SOUP',    bg: [0,0,0] },
   { min: 30,   name: 'BACTERIAL DAWN',     bg: [0,2,0] },
