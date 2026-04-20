@@ -47,7 +47,8 @@ export class World {
     }
 
     this.grid.rebuild(this.orgs);
-    for (const o of this.orgs) o.update(this.grid.nearby(o.x, o.y, SIGHT));
+    const n = this.orgs.length;
+    for (let i = 0; i < n; i++) this.orgs[i].update(this.grid.nearby(this.orgs[i].x, this.orgs[i].y, SIGHT));
     for (let i = this.orgs.length - 1; i >= 0; i--) {
       if (this.orgs[i].dead) this.orgs.splice(i, 1);
     }
