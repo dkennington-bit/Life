@@ -16,6 +16,7 @@ export class UI {
 
     this._populateDropdown();
     this._bindToggle();
+    this._bindHardRefresh();
   }
 
   _populateDropdown() {
@@ -26,6 +27,16 @@ export class UI {
       this._sel.appendChild(opt);
     });
     this._sel.addEventListener('change', () => this._buildSliders(+this._sel.value));
+  }
+
+  _bindHardRefresh() {
+    document.getElementById('hard-refresh').addEventListener('click', async () => {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      location.reload(true);
+    });
   }
 
   _bindToggle() {
