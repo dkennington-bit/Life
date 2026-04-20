@@ -43,6 +43,12 @@ Automatically injects the current HEAD hash on every commit:
 The SW cache key change forces browsers to evict stale cached assets on the
 next visit, so users always get fresh files after a deploy.
 
+The hook source lives at `.hooks/pre-commit` in the repo. If it ever goes
+missing from `.git/hooks/`, restore it with:
+```sh
+cp .hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
 ## Service worker gotcha
 If a user's browser is still showing an old version, they need to either:
 - Hard-reload (hold reload on iPhone, or Ctrl+Shift+R on desktop)

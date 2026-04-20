@@ -1,0 +1,7 @@
+#!/bin/sh
+HASH=$(git rev-parse --short HEAD)
+
+sed -i "s/const BUILD_COMMIT = '[^']*'/const BUILD_COMMIT = '$HASH'/" js/main.js
+sed -i "s/const CACHE = 'primordial-[^']*'/const CACHE = 'primordial-$HASH'/" sw.js
+
+git add js/main.js sw.js
