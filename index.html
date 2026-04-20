@@ -18,14 +18,13 @@
     padding: 8px 12px;
     font-family: monospace; font-size: 22px; color: #3a3;
     pointer-events: none;
-    display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
   }
   #ui span { opacity: 0.7; }
 
-  #commit {
-    position: fixed; top: 26px; right: 12px;
-    font-family: monospace; font-size: 9px; color: #3a3; opacity: 0.4;
-    pointer-events: none; letter-spacing: 0.5px;
+  #hud-right {
+    position: fixed; top: 8px; right: 12px;
+    font-family: monospace; font-size: 22px; color: #3a3; opacity: 0.7;
+    pointer-events: none; text-align: right; line-height: 1.5;
   }
 
   #era {
@@ -91,10 +90,11 @@
 
 <div id="ui">
   <span id="pop">organisms: 0</span>
-  <span id="gen">generation: 0</span>
-  <span id="time">day: 0</span>
 </div>
-<div id="commit"></div>
+<div id="hud-right">
+  <div id="commit"></div>
+  <div id="time">day: 0</div>
+</div>
 <div id="era"></div>
 <div id="legend"></div>
 
