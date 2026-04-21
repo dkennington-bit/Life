@@ -7,8 +7,9 @@ ES6 modules served by GitHub Pages at `dkennington-bit.github.io/Life/`.
 ## File structure
 ```
 index.html          — shell HTML + CSS, loads js/main.js as an ES module
+version.js          — VERSION string (e.g. 'v0.001') — THE ONLY FILE TO EDIT FOR VERSION
 js/
-  main.js           — canvas setup, game loop, BUILD_COMMIT stamp
+  main.js           — canvas setup, game loop, imports + displays VERSION
   config.js         — SPECIES array + SLIDER_CONFIG + constants (all live-editable)
   organism.js       — Organism base class + 6 subclasses (Photosynthesizer,
                       Hunter, Swimmer, Archaea, Bloomer, Parasite)
@@ -16,38 +17,36 @@ js/
   grid.js           — SpatialGrid for O(1) neighbor lookup
   particles.js      — Particle system
   ui.js             — HUD + species editor panel
-sw.js               — Service worker (cache key auto-stamped per commit)
+sw.js               — Service worker (cache key must match version)
 manifest.json       — PWA manifest
 ```
+
+## Version numbering — ALWAYS follow on every commit
+
+The version is stored in **`version.js`** at the repo root (one-line file, trivial to edit).
+The service worker cache key in **`sw.js`** (line 1) must be kept in sync with it.
+
+**On every commit, before committing:**
+1. Open `version.js` and increment the version (e.g. `v0.001` → `v0.002`)
+2. Open `sw.js` and update line 1 to match: `const CACHE = 'primordial-v0.002';`
+3. Stage both files along with your other changes
+
+**After every commit, always tell the user the new version number.**
+Example: "Committed as v0.002."
 
 ## Deploy flow — ALWAYS follow this order
 
 1. **Make changes** to any file
-2. **`git add` + `git commit`** — the pre-commit hook auto-stamps the git hash
-   into `js/main.js` (BUILD_COMMIT) and `sw.js` (CACHE key), then stages both.
-   No manual hash update needed.
-3. **`git push -u origin <branch>`** — pushes the feature branch
-4. **Remind the user to merge the PR** — GitHub Pages only deploys from `main`.
+2. **Increment the version** in `version.js` and `sw.js` (see above)
+3. **`git add` + `git commit`** — include `version.js` and `sw.js` in the commit
+4. **`git push -u origin <branch>`** — pushes the feature branch
+5. **Remind the user to merge the PR** — GitHub Pages only deploys from `main`.
    Changes are invisible on the live site until the PR is merged.
-5. After merge, GH Pages rebuilds in ~1 minute. User should see the new
-   BUILD_COMMIT hash in the top-right corner after a hard refresh.
+6. After merge, GH Pages rebuilds in ~1 minute. User should see the new
+   version number in the top-right corner after a hard refresh.
 
 > There is NO build step. No `npm install`, no bundler, no compile step.
 > "Rebuilding" = merging to main. That's it.
-
-## Pre-commit hook (`.git/hooks/pre-commit`)
-Automatically injects the current HEAD hash on every commit:
-- `js/main.js`  → `const BUILD_COMMIT = '<hash>'`
-- `sw.js`       → `const CACHE = 'primordial-<hash>'`
-
-The SW cache key change forces browsers to evict stale cached assets on the
-next visit, so users always get fresh files after a deploy.
-
-The hook source lives at `.hooks/pre-commit` in the repo. If it ever goes
-missing from `.git/hooks/`, restore it with:
-```sh
-cp .hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-```
 
 ## Service worker gotcha
 If a user's browser is still showing an old version, they need to either:

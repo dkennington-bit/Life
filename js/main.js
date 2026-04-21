@@ -1,10 +1,9 @@
 import { TICK } from './config.js';
 import { World } from './world.js';
 import { UI }    from './ui.js';
+import { VERSION } from '../version.js';
 
-// Updated by pre-commit hook — change on every push confirms fresh deploy.
-const BUILD_COMMIT = 'f1fc04e';
-document.getElementById('commit').textContent = BUILD_COMMIT;
+document.getElementById('commit').textContent = VERSION;
 
 // ── canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
