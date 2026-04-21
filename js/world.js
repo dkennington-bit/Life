@@ -32,25 +32,17 @@ export class World {
     }
   }
 
-  spawnFood(x, y) {
+  spawnFood(x, y, value = FOOD_VALUE) {
     this.foods.push({
       x: x ?? Math.random() * this.gw,
       y: y ?? Math.random() * this.gh,
-      value: FOOD_VALUE,
+      value,
     });
   }
 
   update() {
     this.tick++;
     if (this.tick % 60 === 0) this.day++;
-
-    if (this.orgs.length < 20) {
-      for (let i = 0; i < 18; i++) {
-        const spId = i % SPECIES.length;
-        if (!disabledSpecies.has(spId))
-          this.orgs.push(this.spawnOrg(undefined, undefined, null, spId));
-      }
-    }
 
     this.grid.rebuild(this.orgs);
     const n = this.orgs.length;
