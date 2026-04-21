@@ -209,7 +209,11 @@ export class Organism {
       const counts = new Array(SPECIES.length).fill(0);
       for (const o of this.world.orgs) if (!o.dead) counts[o.dna.speciesId]++;
       const mostPop = counts.indexOf(Math.max(...counts));
-      const candidates = this.world.orgs.filter(o => !o.dead && o !== child && o.dna.speciesId === mostPop);
+      const splittingSpId = this.dna.speciesId;
+      const candidates = this.world.orgs.filter(o =>
+        !o.dead && o !== child &&
+        (o.dna.speciesId === mostPop || o.dna.speciesId === splittingSpId)
+      );
       if (candidates.length > 0)
         candidates[Math.floor(Math.random() * candidates.length)].dead = true;
     }
