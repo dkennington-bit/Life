@@ -67,10 +67,10 @@ export class UI {
     this._legendEl.innerHTML = SPECIES.map(sp => {
       const [r, g, b] = sp.color;
       const off = disabledSpecies.has(sp.id);
-      return `<div class="legend-row">` +
-        `<button class="sp-toggle" data-spid="${sp.id}" title="Toggle ${sp.name}">${off ? '○' : '◉'}</button>` +
+      return `<button class="legend-row sp-toggle" data-spid="${sp.id}" title="Toggle ${sp.name}">` +
+        `<span class="sp-icon">${off ? '○' : '◉'}</span>` +
         `<span style="color:rgb(${r},${g},${b});opacity:${off ? 0.3 : 0.75}">● ${sp.name.toLowerCase()}:${counts[sp.id]}</span>` +
-        `</div>`;
+        `</button>`;
     }).join('');
   }
 

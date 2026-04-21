@@ -2,9 +2,11 @@ import { Organism } from '../organism.js';
 import { SIGHT, EAT_RANGE } from '../config.js';
 
 export class PredatorBehavior extends Organism {
-  // Must be larger than prey; preyRatio=0 disables hunting entirely
+  // Must be larger than prey; preyRatio=0 disables hunting; never eats own species
   canAttack(other) {
-    return this.sp.preyRatio > 0 && this.size > other.size;
+    return this.sp.preyRatio > 0
+        && this.size > other.size
+        && other.dna.speciesId !== this.dna.speciesId;
   }
 
   _behavior({ nearFood, nearFoodDist, nearPrey, nearPreyDist, nearThreat, nearThreatDist }) {
