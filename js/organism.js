@@ -1,4 +1,4 @@
-import { SPECIES, EAT_RANGE, SIGHT, STARVE_BASE, MUTATION, MAX_SIZE, KILL_VALUE } from './config.js';
+import { SPECIES, EAT_RANGE, SIGHT, STARVE_BASE, MUTATION, MAX_SIZE } from './config.js';
 
 let _nextId = 0;
 
@@ -125,7 +125,7 @@ export class Organism {
   // ── actions ───────────────────────────────────────────────────────────────
   _kill(prey) {
     prey.dead = true;
-    this.energy += KILL_VALUE + prey.size * 4;
+    this.energy += prey.energy * 0.8;
     this.digestTimer = this.sp.digestTime ?? 0;
     this.world.particles.spawn(prey.x, prey.y, prey.dna.color, 6);
   }
@@ -224,8 +224,13 @@ export class Organism {
   die() {
     this.dead = true;
     this.world.particles.spawn(this.x, this.y, this.dna.color, Math.ceil(this.size * 2));
-    for (let i = 0; i < Math.floor(this.size); i++)
-      this.world.spawnFood(this.x + (Math.random() - 0.5) * 4, this.y + (Math.random() - 0.5) * 4);
+    const pellets = Math.max(1, Math.floor(this.size));
+    for (let i = 0; i < pellets; i++)
+      this.world.spawnFood(
+        this.x + (Math.random() - 0.5) * 4,
+        this.y + (Math.random() - 0.5) * 4,
+        10,
+      );
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────

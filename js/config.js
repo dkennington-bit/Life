@@ -4,7 +4,6 @@ export const FOOD_COUNT  = 220;
 export const EAT_RANGE   = 2;
 export const STARVE_BASE = 0.03;
 export const FOOD_VALUE  = 25;
-export const KILL_VALUE  = 42;
 export const SIGHT       = 40;
 export const MUTATION    = 0.08;
 export const MAX_SIZE    = 12;
