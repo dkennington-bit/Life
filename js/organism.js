@@ -11,18 +11,12 @@ export class Organism {
     this.gen   = 0;
 
     const sp = SPECIES[spId];
-    this.dna = parentDNA ? {
-      speciesId: spId,
-      color:    sp.color.slice(),
-      speed:    Math.max(0.2, parentDNA.speed + (Math.random() - 0.5) * MUTATION * 2),
-      size:     Math.max(0.8, Math.min(MAX_SIZE, parentDNA.size + (Math.random() - 0.5) * MUTATION * 3)),
-      lineage:  parentDNA.lineage,
-    } : {
+    this.dna = {
       speciesId: spId,
       color:    sp.color.slice(),
       speed:    sp.baseSpeed + (Math.random() - 0.5) * 0.2,
       size:     Math.max(0.8, sp.baseSize + (Math.random() - 0.5) * 0.5),
-      lineage:  _nextId,
+      lineage:  parentDNA ? parentDNA.lineage : _nextId,
     };
 
     this.x  = x  ?? Math.random() * world.gw;
