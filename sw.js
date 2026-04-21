@@ -1,4 +1,4 @@
-const CACHE = 'primordial-v0.003';
+const CACHE = 'primordial-v0.004';
 const ASSETS = [
   '/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js',
   '/Life/js/config.js', '/Life/js/grid.js', '/Life/js/particles.js',
