@@ -157,7 +157,7 @@ export class Organism {
 
     if (this.energy <= 0) { this.die(); return; }
 
-    if (this.energy > sp.splitAt && this.world.orgs.length < this.world.maxPop) this._split();
+    if (this.energy > sp.splitAt) this._split();
 
     this._ax = 0; this._ay = 0;
     this._behavior(this.sense(neighbors));
@@ -204,6 +204,16 @@ export class Organism {
     child.gen    = this.gen + 1;
     child.energy = this.energy;
     this.world.orgs.push(child);
+
+    if (this.world.orgs.length > this.world.maxPop) {
+      const counts = new Array(SPECIES.length).fill(0);
+      for (const o of this.world.orgs) if (!o.dead) counts[o.dna.speciesId]++;
+      const mostPop = counts.indexOf(Math.max(...counts));
+      const candidates = this.world.orgs.filter(o => !o.dead && o !== child && o.dna.speciesId === mostPop);
+      if (candidates.length > 0)
+        candidates[Math.floor(Math.random() * candidates.length)].dead = true;
+    }
+
     this.world.particles.spawn(this.x, this.y, this.dna.color, 3);
   }
 
