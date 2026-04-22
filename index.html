@@ -101,6 +101,160 @@
     cursor: pointer; touch-action: manipulation;
   }
   #hard-refresh:active { background: rgba(0,50,0,0.95); color: #9f9; }
+
+  /* ── goal HUD (during runs) ── */
+  #goal-hud {
+    position: fixed; top: 46px; left: 50%; transform: translateX(-50%);
+    font-family: monospace; color: #6d6; text-align: center;
+    pointer-events: none; display: none;
+  }
+  #goal-hud.visible { display: block; }
+  #goal-timer { font-size: 44px; letter-spacing: 3px; opacity: 0.95; }
+  #goal-timer.locked { color: #9f9; }
+  #goal-sub { font-size: 14px; opacity: 0.6; margin-top: 2px; letter-spacing: 1.5px; }
+
+  /* ── pause button (during runs) ── */
+  #pause-btn {
+    position: fixed; bottom: 18px; right: 62px;
+    background: rgba(0,20,0,0.75);
+    border: 1px solid rgba(60,160,60,0.35); border-radius: 4px;
+    color: #5c5; font-size: 11px; font-family: monospace;
+    padding: 8px 12px; letter-spacing: 1px; cursor: pointer;
+    z-index: 20; display: none; touch-action: manipulation;
+  }
+  #pause-btn.visible { display: block; }
+  #pause-btn:active { background: rgba(0,60,0,0.85); color: #9f9; }
+
+  /* ── menu overlay ── */
+  #menu-root {
+    position: fixed; inset: 0; z-index: 100;
+    display: none; align-items: flex-start; justify-content: center;
+    padding: 40px 16px; overflow-y: auto;
+    background: rgba(0,0,0,0.85);
+    font-family: monospace; color: #9f9;
+  }
+  #menu-root.visible { display: flex; }
+
+  .menu-panel {
+    width: 100%; max-width: 520px;
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 24px 20px;
+  }
+  .menu-panel.center { align-items: center; text-align: center; }
+
+  .menu-title {
+    font-size: 26px; letter-spacing: 4px; color: #6f6; margin: 0;
+  }
+  .menu-title.win  { color: #8f8; }
+  .menu-title.lose { color: #f99; }
+  .menu-sub {
+    font-size: 13px; opacity: 0.65; margin-bottom: 8px; letter-spacing: 1px;
+  }
+  .menu-section-label {
+    font-size: 10px; opacity: 0.5; letter-spacing: 2px;
+    margin-top: 12px; text-transform: uppercase;
+  }
+  .menu-back {
+    align-self: flex-start;
+    background: none; border: none; color: #6d6; opacity: 0.7;
+    font-family: monospace; font-size: 12px; cursor: pointer;
+    padding: 4px 0; letter-spacing: 1px;
+  }
+  .menu-back:hover { opacity: 1; }
+
+  .menu-btn {
+    display: block; width: 100%;
+    padding: 12px 14px; margin: 0;
+    background: rgba(0,25,0,0.85); color: #6d6;
+    border: 1px solid rgba(60,160,60,0.35); border-radius: 4px;
+    font-family: monospace; font-size: 13px; letter-spacing: 2px;
+    cursor: pointer; text-align: center; touch-action: manipulation;
+  }
+  .menu-btn:hover:not(:disabled) { background: rgba(0,45,0,0.9); color: #9f9; }
+  .menu-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .menu-btn.primary {
+    background: rgba(0,60,0,0.85); color: #afa;
+    border-color: rgba(120,220,120,0.55);
+  }
+  .menu-btn.primary:hover:not(:disabled) { background: rgba(0,90,0,0.95); }
+  .menu-btn.danger {
+    color: #d77; border-color: rgba(180,80,80,0.4);
+    margin-top: 20px; font-size: 11px;
+  }
+
+  .menu-list { display: flex; flex-direction: column; gap: 8px; }
+  .world-card {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 14px 16px;
+    background: rgba(0,15,0,0.7);
+    border: 1px solid rgba(60,160,60,0.25); border-radius: 4px;
+    font-family: monospace; cursor: pointer; text-align: left;
+    color: inherit;
+  }
+  .world-card:hover { background: rgba(0,30,0,0.9); border-color: rgba(60,200,60,0.5); }
+  .world-name { font-size: 15px; color: #9f9; letter-spacing: 1.5px; }
+  .world-meta { font-size: 11px; opacity: 0.55; }
+
+  .species-list { display: flex; flex-direction: column; gap: 6px; }
+  .species-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0,15,0,0.6);
+    border: 1px solid rgba(60,160,60,0.2); border-radius: 4px;
+    font-family: monospace; cursor: pointer; text-align: left;
+    color: inherit;
+  }
+  .species-row:hover { background: rgba(0,30,0,0.85); border-color: rgba(60,200,60,0.4); }
+  .species-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .species-name { flex: 1; font-size: 13px; color: #9f9; letter-spacing: 1px; }
+  .species-tag { font-size: 10px; opacity: 0.55; letter-spacing: 1px; }
+
+  .unlock-prompt {
+    border: 1px solid rgba(120,220,120,0.5); border-radius: 4px;
+    padding: 14px; background: rgba(0,40,0,0.6); margin: 8px 0;
+  }
+  .unlock-title { font-size: 13px; color: #afa; letter-spacing: 2px; }
+  .unlock-sub   { font-size: 11px; opacity: 0.65; margin-top: 2px; margin-bottom: 10px; }
+  .niche-grid   { display: flex; flex-direction: column; gap: 6px; }
+  .niche-card {
+    padding: 10px 12px;
+    background: rgba(0,25,0,0.8);
+    border: 1px solid rgba(60,180,60,0.4); border-radius: 3px;
+    font-family: monospace; cursor: pointer; text-align: left;
+    color: inherit;
+  }
+  .niche-card:hover { background: rgba(0,55,0,0.9); border-color: rgba(120,255,120,0.7); }
+  .niche-name  { font-size: 13px; color: #afa; letter-spacing: 1.5px; }
+  .niche-blurb { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+
+  .name-label { font-size: 12px; opacity: 0.75; display: flex; align-items: center; gap: 8px; }
+  .name-input {
+    flex: 1; background: rgba(0,25,0,0.85); color: #9f9;
+    border: 1px solid rgba(60,160,60,0.3); border-radius: 3px;
+    font-family: monospace; font-size: 13px; padding: 6px 10px;
+  }
+
+  .budget {
+    font-size: 13px; opacity: 0.85; letter-spacing: 1px;
+    padding: 8px 12px; border: 1px solid rgba(60,160,60,0.25); border-radius: 3px;
+    background: rgba(0,15,0,0.5); text-align: center;
+  }
+  .budget-val { color: #afa; }
+  .budget-val.over { color: #f88; }
+
+  .gene-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .gene-row {
+    display: grid; grid-template-columns: 110px 1fr 45px 40px;
+    gap: 8px; align-items: center;
+  }
+  .gene-label { font-size: 11px; opacity: 0.7; letter-spacing: 0.5px; }
+  .gene-row input[type=range] { accent-color: #5c5; }
+  .gene-val    { font-size: 11px; text-align: right; opacity: 0.9; }
+  .gene-cost   { font-size: 10px; text-align: right; opacity: 0.7; }
+  .gene-cost.spend  { color: #f88; }
+  .gene-cost.refund { color: #8f8; }
+
+  .win-bonus { font-size: 13px; color: #afa; opacity: 0.85; margin: 4px 0 12px; }
 </style>
 </head>
 <body>
@@ -115,6 +269,14 @@
 </div>
 <div id="era"></div>
 <div id="legend"></div>
+
+<button id="pause-btn">‹ menu</button>
+<div id="goal-hud">
+  <div id="goal-timer">0.0s</div>
+  <div id="goal-sub">0 / 10 — hold for 60s</div>
+</div>
+
+<div id="menu-root"></div>
 
 <button id="ctrl-toggle" title="Species editor">⚙</button>
 <div id="ctrl-panel">
