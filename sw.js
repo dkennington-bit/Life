@@ -1,8 +1,10 @@
-const CACHE = 'primordial-v0.005';
+const CACHE = 'primordial-v0.006';
 const ASSETS = [
   '/Life/', '/Life/index.html', '/Life/manifest.json', '/Life/sw.js',
+  '/Life/version.js',
   '/Life/js/config.js', '/Life/js/grid.js', '/Life/js/particles.js',
   '/Life/js/organism.js', '/Life/js/world.js', '/Life/js/ui.js', '/Life/js/main.js',
+  '/Life/js/menu.js', '/Life/js/gamestate.js',
   '/Life/js/behaviors/PeacefulBehavior.js',
   '/Life/js/behaviors/PredatorBehavior.js',
   '/Life/js/behaviors/VenomBehavior.js',

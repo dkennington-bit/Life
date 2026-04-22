@@ -1,4 +1,4 @@
-import { SPECIES, SLIDER_CONFIG, ERAS, disabledSpecies } from './config.js';
+import { SPECIES, SLIDER_CONFIG, ERAS, disabledSpecies, GOAL_COUNT, GOAL_TICKS } from './config.js';
 
 export class UI {
   constructor(world) {
@@ -13,6 +13,9 @@ export class UI {
     this._toggle   = document.getElementById('ctrl-toggle');
     this._sel      = document.getElementById('species-select');
     this._sliders  = document.getElementById('sliders');
+    this._goalHud    = document.getElementById('goal-hud');
+    this._goalTimer  = document.getElementById('goal-timer');
+    this._goalSub    = document.getElementById('goal-sub');
 
     this._lastCounts = new Array(SPECIES.length).fill(0);
 
@@ -154,5 +157,18 @@ export class UI {
 
     const counts = this.world.speciesCounts();
     this._renderLegend(counts);
+  }
+
+  // ── goal HUD (roguelite runs) ────────────────────────────────────────────
+  showGoalHud() { this._goalHud.classList.add('visible'); }
+  hideGoalHud() { this._goalHud.classList.remove('visible'); }
+
+  // count = living of target species; ticks = consecutive ticks at goal.
+  setGoalHud(count, ticks) {
+    const seconds = (ticks / 60).toFixed(1);
+    this._goalTimer.textContent = seconds + 's';
+    this._goalTimer.classList.toggle('locked', count >= GOAL_COUNT);
+    const target = (GOAL_TICKS / 60) | 0;
+    this._goalSub.textContent = `${count} / ${GOAL_COUNT} — hold for ${target}s`;
   }
 }

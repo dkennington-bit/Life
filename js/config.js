@@ -100,3 +100,62 @@ export const ERAS = [
   { min: 500,  name: 'PREDATOR ERA',       bg: [2,0,5] },
   { min: 1000, name: 'APEX MICROBE AGE',   bg: [5,0,2] },
 ];
+
+// ── roguelite constants ────────────────────────────────────────────────────
+// Starter niche: players always begin a new world with this one unlocked.
+export const STARTER_BASE_ID = 4;          // Bloomer
+// Unlock pool the player picks from after a first-time win.
+export const UNLOCKABLE_BASE_IDS = [0, 1, 3, 2, 5];
+// Player-facing niche labels (keeps SPECIES[].name available for debug).
+export const NICHE_NAMES = {
+  0: 'Photosynthesis',
+  1: 'Predation',
+  2: 'Venom',
+  3: 'Archaeon',
+  4: 'Bacterium',
+  5: 'Parasitism',
+};
+export const NICHE_BLURBS = {
+  0: 'Turns light into energy. Slow, small, peaceful.',
+  1: 'Hunts smaller organisms directly.',
+  2: 'Fast stinger; venom drains prey over time.',
+  3: 'Large, slow, efficient apex predator.',
+  4: 'Basic bacterium. Eats nutrients.',
+  5: 'Parasite. Drains living hosts.',
+};
+export const GOAL_COUNT          = 10;
+export const GOAL_TICKS          = 60 * 60;   // 60 seconds at 60 FPS
+export const FOUNDER_COUNT       = 5;
+export const STARTING_GENE_BUDGET = 10;
+export const WIN_GENE_BONUS      = 5;
+
+// Gene picker: which attributes are editable per base species.
+// Universal genes apply to everyone; niche-specific ones layer on top.
+export const UNIVERSAL_GENES = ['baseSpeed', 'baseSize', 'splitAt', 'metabolismMult'];
+export const NICHE_GENES = {
+  0: ['photoRate'],
+  1: ['preyRatio', 'huntEnergy', 'digestTime'],
+  2: ['venomDuration', 'venomDmg', 'venomGain'],
+  3: ['preyRatio', 'huntEnergy', 'digestTime'],
+  4: [],
+  5: ['drainRate'],
+};
+
+// Cost model: points spent = sum over genes of signed-step-cost(value - default).
+// Each entry: { step, dir } — step is the "per-point" delta; dir is which
+// direction costs points (+1 means higher-than-default costs; −1 means lower
+// costs). Going the "free" direction refunds points symmetrically.
+export const GENE_COSTS = {
+  baseSpeed:      { step: 0.1,  dir: +1 },
+  baseSize:       { step: 0.5,  dir: +1 },
+  splitAt:        { step: 10,   dir: -1 },  // lower split threshold is better
+  metabolismMult: { step: 0.1,  dir: -1 },  // lower metabolism is better
+  photoRate:      { step: 0.05, dir: +1 },
+  preyRatio:      { step: 0.1,  dir: +1 },
+  huntEnergy:     { step: 50,   dir: +1 },
+  digestTime:     { step: 30,   dir: -1 },  // shorter digest is better
+  drainRate:      { step: 0.2,  dir: +1 },
+  venomDuration:  { step: 20,   dir: +1 },
+  venomDmg:       { step: 0.1,  dir: +1 },
+  venomGain:      { step: 2,    dir: +1 },
+};
