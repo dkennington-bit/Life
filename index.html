@@ -39,15 +39,24 @@
     font-family: monospace; font-size: 18px;
     line-height: 1.6;
   }
-  #legend span { opacity: 0.75; }
+  #legend span { opacity: 0.9; }
   .legend-row {
-    display: flex; align-items: center; gap: 5px;
-    background: none; border: none; padding: 2px 0;
+    padding: 2px 0;
     font-family: monospace; font-size: 18px; line-height: 1.6;
-    cursor: pointer; touch-action: manipulation;
+    opacity: 0.85;
   }
-  .sp-icon { font-size: 16px; color: #5c5; line-height: 1; opacity: 0.7; }
-  .legend-row:hover .sp-icon { opacity: 1; color: #9f9; }
+  .legend-flag {
+    margin-left: 6px; padding: 1px 6px;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 2px; color: #fff;
+  }
+  .legend-flag.flag-t1 { background: rgba(180,140,40,0.65); }
+  .legend-flag.flag-t2 { background: rgba(200,110,40,0.75); }
+  .legend-flag.flag-t3 { background: rgba(210,60,60,0.85); }
+  .legend-timer {
+    margin-left: 4px; font-size: 12px; color: #9f9;
+    letter-spacing: 0.5px;
+  }
 
   /* ── controller ── */
   #ctrl-toggle {
@@ -273,7 +282,7 @@
 <button id="pause-btn">‹ menu</button>
 <div id="goal-hud">
   <div id="goal-timer">0.0s</div>
-  <div id="goal-sub">0 / 10 — hold for 60s</div>
+  <div id="goal-sub">0 / 10 — hold for 30s</div>
 </div>
 
 <div id="menu-root"></div>

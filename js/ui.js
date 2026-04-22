@@ -1,4 +1,7 @@
-import { SPECIES, SLIDER_CONFIG, ERAS, disabledSpecies, GOAL_COUNT, GOAL_TICKS } from './config.js';
+import {
+  SPECIES, SLIDER_CONFIG, ERAS, GOAL_COUNT, GOAL_TICKS,
+  ENDANGERED_LABELS, ENDANGERED_RECOVERY_COUNT, ENDANGERED_RECOVERY_TICKS,
+} from './config.js';
 
 export class UI {
   constructor(world) {
@@ -22,7 +25,6 @@ export class UI {
     this._populateDropdown();
     this._bindToggle();
     this._bindHardRefresh();
-    this._bindLegendToggle();
   }
 
   _populateDropdown() {
@@ -46,35 +48,31 @@ export class UI {
     });
   }
 
-  _bindLegendToggle() {
-    this._legendEl.addEventListener('click', e => {
-      const btn = e.target.closest('.sp-toggle');
-      if (!btn) return;
-      const spId = +btn.dataset.spid;
-      if (disabledSpecies.has(spId)) {
-        disabledSpecies.delete(spId);
-        for (let i = 0; i < 3; i++)
-          this.world.orgs.push(this.world.spawnOrg(undefined, undefined, null, spId));
-      } else {
-        disabledSpecies.add(spId);
-        for (const o of this.world.orgs)
-          if (o.dna.speciesId === spId) o.dead = true;
-      }
-      localStorage.setItem('primordial_disabled', JSON.stringify([...disabledSpecies]));
-      this._renderLegend(this._lastCounts);
-    });
-  }
-
   _renderLegend(counts) {
     this._lastCounts = counts;
-    this._legendEl.innerHTML = SPECIES.map(sp => {
+    const rows = [];
+    for (const sp of SPECIES) {
+      const c = counts[sp.id];
+      if (c === 0) continue;   // only living species are listed
       const [r, g, b] = sp.color;
-      const off = disabledSpecies.has(sp.id);
-      return `<button class="legend-row sp-toggle" data-spid="${sp.id}" title="Toggle ${sp.name}">` +
-        `<span class="sp-icon">${off ? '○' : '◉'}</span>` +
-        `<span style="color:rgb(${r},${g},${b});opacity:${off ? 0.3 : 0.75}">● ${sp.name.toLowerCase()}:${counts[sp.id]}</span>` +
-        `</button>`;
-    }).join('');
+      const tier = this.world.endangered ? this.world.endangered[sp.id] : 0;
+      let suffix = '';
+      if (tier > 0 && tier < 4) {
+        suffix = ` <span class="legend-flag flag-t${tier}">${ENDANGERED_LABELS[tier]}</span>`;
+        if (c > ENDANGERED_RECOVERY_COUNT) {
+          const remaining = Math.max(
+            0,
+            (ENDANGERED_RECOVERY_TICKS - (this.world.recoveryTicks[sp.id] || 0)) / 60,
+          );
+          suffix += ` <span class="legend-timer">${remaining.toFixed(1)}s</span>`;
+        }
+      }
+      rows.push(
+        `<div class="legend-row" style="color:rgb(${r},${g},${b})">` +
+        `● ${sp.name.toLowerCase()}:${c}${suffix}</div>`,
+      );
+    }
+    this._legendEl.innerHTML = rows.join('');
   }
 
   _bindToggle() {

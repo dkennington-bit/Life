@@ -1,4 +1,8 @@
-import { SPECIES, INIT_POP, FOOD_COUNT, FOOD_VALUE, MAX_POP, SIGHT, disabledSpecies, FOUNDER_COUNT } from './config.js';
+import {
+  SPECIES, INIT_POP, FOOD_COUNT, FOOD_VALUE, MAX_POP, SIGHT,
+  disabledSpecies, FOUNDER_COUNT,
+  ENDANGERED_RECOVERY_COUNT, ENDANGERED_RECOVERY_TICKS, ENDANGERED_RESCUE_SPAWN,
+} from './config.js';
 import { SpatialGrid } from './grid.js';
 import { Particles }   from './particles.js';
 import { spawnOrg as spawnOrgFactory, rehydrateOrg } from './species/index.js';
@@ -17,6 +21,15 @@ export class World {
     this.tick       = 0;
     this.day        = 0;
     this.generation = 0;
+
+    // Endangered tracking: per-species status tier (0=healthy, 1=vulnerable,
+    // 2=endangered, 3=critically endangered, 4=extinct), consecutive ticks
+    // above the recovery count, and whether the species has ever existed in
+    // this world (so a never-seeded species isn't flagged the moment it
+    // "drops to zero"). All three arrays are indexed by species id.
+    this.endangered     = new Array(SPECIES.length).fill(0);
+    this.recoveryTicks  = new Array(SPECIES.length).fill(0);
+    this._everAlive     = new Array(SPECIES.length).fill(false);
   }
 
   spawnOrg(x, y, parentDNA, forcedSpeciesId) {
@@ -55,6 +68,9 @@ export class World {
       tick: this.tick,
       day: this.day,
       generation: this.generation,
+      endangered:    this.endangered.slice(),
+      recoveryTicks: this.recoveryTicks.slice(),
+      everAlive:     this._everAlive.slice(),
       foods: this.foods.map(f => ({ x: f.x, y: f.y, value: f.value })),
       orgs: this.orgs.filter(o => !o.dead).map(o => ({
         spId:          o.dna.speciesId,
@@ -83,10 +99,21 @@ export class World {
     this.tick       = snap.tick       ?? 0;
     this.day        = snap.day        ?? 0;
     this.generation = snap.generation ?? 0;
+    const n = SPECIES.length;
+    const takeArr = (src, fill) => {
+      const out = new Array(n).fill(fill);
+      if (Array.isArray(src)) for (let i = 0; i < Math.min(n, src.length); i++) out[i] = src[i];
+      return out;
+    };
+    this.endangered    = takeArr(snap.endangered, 0);
+    this.recoveryTicks = takeArr(snap.recoveryTicks, 0);
+    this._everAlive    = takeArr(snap.everAlive, false);
     this.foods = (snap.foods || []).map(f => ({ x: f.x, y: f.y, value: f.value }));
     this.orgs  = (snap.orgs  || []).map(s => rehydrateOrg(this, s));
     // Keep food pool at target density (world may have been saved mid-famine).
     while (this.foods.length < FOOD_COUNT) this.spawnFood();
+    // Any species currently alive has obviously existed at some point.
+    for (const o of this.orgs) this._everAlive[o.dna.speciesId] = true;
   }
 
   spawnFood(x, y, value = FOOD_VALUE) {
@@ -107,7 +134,45 @@ export class World {
     for (let i = this.orgs.length - 1; i >= 0; i--) {
       if (this.orgs[i].dead) this.orgs.splice(i, 1);
     }
+    this._updateEndangered();
     this.particles.update();
+  }
+
+  // Transition species between conservation tiers each tick.
+  //   0 alive (+ previously seen) → bump tier, spawn 2 rescues, reset recovery
+  //   4 (extinct) → terminal, no further changes
+  //   flagged + >RECOVERY_COUNT alive for RECOVERY_TICKS consecutive → clear
+  _updateEndangered() {
+    const counts = this.speciesCounts();
+    for (let i = 0; i < SPECIES.length; i++) {
+      if (counts[i] > 0) this._everAlive[i] = true;
+
+      if (this.endangered[i] >= 4) continue;   // fully extinct, terminal
+      if (!this._everAlive[i])     continue;   // never seeded, ignore
+
+      if (counts[i] === 0) {
+        this.endangered[i]++;
+        this.recoveryTicks[i] = 0;
+        if (this.endangered[i] < 4) {
+          for (let k = 0; k < ENDANGERED_RESCUE_SPAWN; k++) {
+            this.orgs.push(this.spawnOrg(undefined, undefined, null, i));
+          }
+        }
+        continue;
+      }
+
+      if (this.endangered[i] > 0) {
+        if (counts[i] > ENDANGERED_RECOVERY_COUNT) {
+          this.recoveryTicks[i]++;
+          if (this.recoveryTicks[i] >= ENDANGERED_RECOVERY_TICKS) {
+            this.endangered[i]    = 0;
+            this.recoveryTicks[i] = 0;
+          }
+        } else {
+          this.recoveryTicks[i] = 0;
+        }
+      }
+    }
   }
 
   draw(ctx, eraBg) {
