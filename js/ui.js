@@ -25,6 +25,7 @@ export class UI {
     this._populateDropdown();
     this._bindToggle();
     this._bindHardRefresh();
+    this._buildGlobalSliders();
   }
 
   _populateDropdown() {
@@ -83,6 +84,40 @@ export class UI {
     });
     // prevent canvas touch-action from swallowing slider touches
     this._panel.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+  }
+
+  _buildGlobalSliders() {
+    const container = document.getElementById('global-sliders');
+
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'slider-label';
+    lbl.textContent = 'pop limit';
+
+    const inp = document.createElement('input');
+    inp.type  = 'range';
+    inp.min   = 50;
+    inp.max   = 1000;
+    inp.step  = 25;
+    inp.value = this.world.maxPop;
+
+    const val = document.createElement('div');
+    val.className   = 'slider-val';
+    val.textContent = this.world.maxPop;
+
+    const onSlide = () => {
+      this.world.maxPop = parseInt(inp.value, 10);
+      val.textContent = inp.value;
+    };
+    inp.addEventListener('input',  onSlide);
+    inp.addEventListener('change', onSlide);
+
+    row.appendChild(lbl);
+    row.appendChild(inp);
+    row.appendChild(val);
+    container.appendChild(row);
   }
 
   _buildSliders(spId) {
