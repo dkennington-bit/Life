@@ -22,9 +22,12 @@ export class UI {
 
     this._lastCounts = new Array(SPECIES.length).fill(0);
 
+    this._globalSliders = document.getElementById('global-sliders');
+
     this._populateDropdown();
     this._bindToggle();
     this._bindHardRefresh();
+    this._buildGlobalSliders();
   }
 
   _populateDropdown() {
@@ -83,6 +86,44 @@ export class UI {
     });
     // prevent canvas touch-action from swallowing slider touches
     this._panel.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+  }
+
+  _buildGlobalSliders() {
+    const cfgs = [
+      { label: 'pop cap', get: () => this.world.maxPop, set: v => { this.world.maxPop = v; }, min: 50, max: 1000, step: 10, fmt: v => v | 0 },
+    ];
+    cfgs.forEach(cfg => {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+
+      const lbl = document.createElement('div');
+      lbl.className = 'slider-label';
+      lbl.textContent = cfg.label;
+
+      const inp = document.createElement('input');
+      inp.type  = 'range';
+      inp.min   = cfg.min;
+      inp.max   = cfg.max;
+      inp.step  = cfg.step;
+      inp.value = cfg.get();
+
+      const val = document.createElement('div');
+      val.className   = 'slider-val';
+      val.textContent = cfg.fmt(cfg.get());
+
+      const onSlide = () => {
+        const v = parseFloat(inp.value);
+        cfg.set(v);
+        val.textContent = cfg.fmt(v);
+      };
+      inp.addEventListener('input',  onSlide);
+      inp.addEventListener('change', onSlide);
+
+      row.appendChild(lbl);
+      row.appendChild(inp);
+      row.appendChild(val);
+      this._globalSliders.appendChild(row);
+    });
   }
 
   _buildSliders(spId) {
