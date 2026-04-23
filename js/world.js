@@ -30,10 +30,41 @@ export class World {
     this.endangered     = new Array(SPECIES.length).fill(0);
     this.recoveryTicks  = new Array(SPECIES.length).fill(0);
     this._everAlive     = new Array(SPECIES.length).fill(false);
+
+    // Per-species count of organisms queued for silent edge despawn.
+    this.despawnQueue = new Array(SPECIES.length).fill(0);
+  }
+
+  // Population minus organisms already committed to edge-despawn, used to
+  // prevent over-queuing at the pop cap.
+  get effectivePop() {
+    let queued = 0;
+    for (const n of this.despawnQueue) queued += n;
+    return this.orgs.length - queued;
   }
 
   spawnOrg(x, y, parentDNA, forcedSpeciesId) {
     return spawnOrgFactory(this, x, y, parentDNA, forcedSpeciesId);
+  }
+
+  // Spawn an organism of species spId at a random position along one of the
+  // four off-screen edges, with velocity pointing inward.
+  spawnAtEdge(spId) {
+    const { gw, gh } = this;
+    const B = 40; // off-screen border width (matches M in organism._move)
+    const edge = Math.floor(Math.random() * 4);
+    let x, y, vx, vy;
+    const spd = 1.2 + Math.random() * 0.8;
+    switch (edge) {
+      case 0: x = Math.random() * gw;        y = -(Math.random() * B);        vx = (Math.random()-0.5)*0.5; vy =  spd; break; // top
+      case 1: x = gw + Math.random() * B;    y = Math.random() * gh;          vx = -spd; vy = (Math.random()-0.5)*0.5; break; // right
+      case 2: x = Math.random() * gw;        y = gh + Math.random() * B;      vx = (Math.random()-0.5)*0.5; vy = -spd; break; // bottom
+      case 3: x = -(Math.random() * B);      y = Math.random() * gh;          vx =  spd; vy = (Math.random()-0.5)*0.5; break; // left
+    }
+    const org = this.spawnOrg(x, y, null, spId);
+    org.vx = vx;
+    org.vy = vy;
+    return org;
   }
 
   // opts:
@@ -49,7 +80,7 @@ export class World {
     for (let i = 0; i < INIT_POP; i++) {
       const spId = i % SPECIES.length;
       if (!disabledSpecies.has(spId))
-        this.orgs.push(this.spawnOrg(undefined, undefined, null, spId));
+        this.orgs.push(this.spawnAtEdge(spId));
     }
   }
 
@@ -57,7 +88,7 @@ export class World {
   // Used at the start of a roguelite run.
   spawnFounders(baseId, n = FOUNDER_COUNT) {
     for (let i = 0; i < n; i++) {
-      this.orgs.push(this.spawnOrg(undefined, undefined, null, baseId));
+      this.orgs.push(this.spawnAtEdge(baseId));
     }
   }
 
@@ -155,7 +186,7 @@ export class World {
         this.recoveryTicks[i] = 0;
         if (this.endangered[i] < 4) {
           for (let k = 0; k < ENDANGERED_RESCUE_SPAWN; k++) {
-            this.orgs.push(this.spawnOrg(undefined, undefined, null, i));
+            this.orgs.push(this.spawnAtEdge(i));
           }
         }
         continue;
