@@ -214,11 +214,16 @@ export class Organism {
     child.energy = this.energy;
     this.world.orgs.push(child);
 
-    if (this.world.effectivePop > this.world.maxPop) {
+    if (this.world.orgs.length > this.world.maxPop) {
       const counts = new Array(SPECIES.length).fill(0);
       for (const o of this.world.orgs) if (!o.dead) counts[o.dna.speciesId]++;
       const mostPop = counts.indexOf(Math.max(...counts));
-      this.world.despawnQueue[mostPop]++;
+      for (const o of this.world.orgs) {
+        if (!o.dead && o.dna.speciesId === mostPop && o !== child) {
+          o.dead = true;
+          break;
+        }
+      }
     }
 
     this.world.particles.spawn(this.x, this.y, this.dna.color, 3);
