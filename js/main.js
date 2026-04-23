@@ -1,4 +1,5 @@
 import { TICK, SPECIES, GOAL_COUNT, GOAL_TICKS, FOUNDER_COUNT, UNIVERSAL_GENES, NICHE_GENES } from './config.js';
+import { applyCard } from './cards.js';
 import { World } from './world.js';
 import { UI }    from './ui.js';
 import { Menu }  from './menu.js';
@@ -127,6 +128,20 @@ function abandonRun(worldId) {
   menu.showWorldMenu(worldId);
 }
 
+// ── mid-run adaptation cards ─────────────────────────────────────────────────
+const CARD_INTERVAL = 30 * 60;  // every 30 s at 60 fps
+
+function showMidRunCards() {
+  gameState = 'menu';
+  ui.hideGoalHud();
+  menu.showMidRunCards(run.baseId, card => {
+    applyCard(run.baseId, card, world.orgs);
+    menu.hide();
+    ui.showGoalHud();
+    gameState = 'running';
+  });
+}
+
 // ── pause ────────────────────────────────────────────────────────────────────
 document.getElementById('pause-btn').addEventListener('click', () => {
   if (!run || run.done) return;
@@ -161,7 +176,13 @@ function loop(ts) {
 
   if (gameState === 'running') {
     world.update();
-    if (run && !run.done) tickGoal();
+    if (run && !run.done) {
+      tickGoal();
+      if (gameState === 'running' && !run.done &&
+          world.tick % CARD_INTERVAL === 0 && world.tick > 0) {
+        showMidRunCards();
+      }
+    }
   }
 
   const eraBg = ui.checkEra();

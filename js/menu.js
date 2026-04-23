@@ -7,6 +7,7 @@ import {
   SPECIES, NICHE_NAMES, NICHE_BLURBS, STARTER_BASE_ID, UNLOCKABLE_BASE_IDS,
   UNIVERSAL_GENES, NICHE_GENES, GENE_COSTS, GOAL_COUNT, GOAL_TICKS,
 } from './config.js';
+import { dealCards } from './cards.js';
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -130,7 +131,7 @@ export class Menu {
       const [r, g, b] = SPECIES[baseId].color;
       return el('button', {
         class: 'species-row',
-        onclick: () => this.showGenePicker(w.id, baseId),
+        onclick: () => this.showCardDraft(w.id, baseId),
       },
         el('span', { class: 'species-dot', style: `background:${fmtColor([r,g,b])}` }),
         el('span', { class: 'species-name' }, v ? v.name : NICHE_NAMES[baseId]),
@@ -300,6 +301,102 @@ export class Menu {
         class: 'menu-btn',
         onclick: () => this.showWorldMenu(worldId),
       }, 'return to world'),
+    );
+    this._show(panel);
+  }
+
+  // ── pre-run card draft (3 rounds × 3 cards) ──────────────────────────────
+  showCardDraft(worldId, baseId) {
+    const w = GameState.getWorld(worldId);
+    if (!w) { this.showMainMenu(); return; }
+
+    const [r, g, b] = SPECIES[baseId].color;
+    const chosenCards = [];
+    const pickedIds = new Set();
+
+    const doRound = (roundNum) => {
+      const cards = dealCards(baseId, 3, pickedIds);
+
+      const panel = el('div', { class: 'menu-panel' },
+        el('button', { class: 'menu-back', onclick: () => this.showWorldMenu(worldId) }, '‹ back'),
+        el('div', { class: 'card-header' },
+          el('span', { style: `color:rgb(${r},${g},${b})` }, NICHE_NAMES[baseId]),
+          el('span', { class: 'card-round-label' }, `round ${roundNum} of 3`),
+        ),
+        el('div', { class: 'menu-sub' }, 'choose a trait adaptation'),
+        el('div', { class: 'card-grid' },
+          ...cards.map(card => el('button', {
+            class: 'card-option',
+            onclick: () => {
+              chosenCards.push(card);
+              pickedIds.add(card.id);
+              if (roundNum < 3) doRound(roundNum + 1);
+              else showSummary();
+            },
+          },
+            el('div', { class: 'card-title' }, card.title),
+            el('div', { class: 'card-desc' }, card.desc),
+          )),
+        ),
+      );
+      this._show(panel);
+    };
+
+    const showSummary = () => {
+      const defaults = GameState.defaultGenesFor(baseId);
+      const genes = { ...defaults };
+      for (const card of chosenCards) {
+        genes[card.key] = Math.round((genes[card.key] + card.delta) * 10000) / 10000;
+      }
+
+      const panel = el('div', { class: 'menu-panel' },
+        el('button', { class: 'menu-back', onclick: () => this.showWorldMenu(worldId) }, '‹ back'),
+        el('h2', { class: 'menu-title' }, 'YOUR ADAPTATIONS'),
+        el('div', { class: 'card-summary' },
+          ...chosenCards.map(card => el('div', { class: 'card-summary-row' },
+            el('span', { class: 'card-summary-title' }, card.title),
+            el('span', { class: 'card-summary-desc' }, card.desc),
+          )),
+        ),
+        el('button', {
+          class: 'menu-btn primary',
+          onclick: () => {
+            const variant = GameState.upsertVariant(worldId, baseId, {
+              name: NICHE_NAMES[baseId],
+              genes,
+            });
+            this.hide();
+            this.cbs.onStartRun(worldId, baseId, variant);
+          },
+        }, 'BEGIN RUN'),
+      );
+      this._show(panel);
+    };
+
+    doRound(1);
+  }
+
+  // ── mid-run adaptation event (called every 30s during a run) ─────────────
+  // Shows 3 cards; calls onPick(card) when the player chooses one.
+  showMidRunCards(baseId, onPick) {
+    const [r, g, b] = SPECIES[baseId].color;
+    const cards = dealCards(baseId, 3, new Set());
+
+    const panel = el('div', { class: 'menu-panel center' },
+      el('div', { class: 'mid-run-label' }, 'adaptation event'),
+      el('div', { class: 'card-header' },
+        el('span', { style: `color:rgb(${r},${g},${b})` }, NICHE_NAMES[baseId]),
+      ),
+      el('div', { class: 'menu-sub' }, 'choose a trait — game paused'),
+      el('div', { class: 'card-grid' },
+        ...cards.map(card => el('button', {
+          class: 'card-option',
+          onclick: () => onPick(card),
+        },
+          el('div', { class: 'card-title' }, card.title),
+          el('div', { class: 'card-desc' }, card.desc),
+        )),
+      ),
     );
     this._show(panel);
   }
