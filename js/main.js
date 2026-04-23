@@ -76,6 +76,10 @@ function startRun(worldId, baseId, variant) {
   ui.world = world;
   if (w.snapshot) world.init({ snapshot: w.snapshot });
   else            world.init({ empty: true });
+  // A new run re-seeds the target species by hand, so its endangered tier
+  // resets: the player gets a fresh three-strikes window each run.
+  world.endangered[baseId]    = 0;
+  world.recoveryTicks[baseId] = 0;
   world.spawnFounders(baseId, FOUNDER_COUNT);
 
   run = { worldId, baseId, goalTicks: 0, done: false };
@@ -144,8 +148,8 @@ function tickGoal() {
 
   ui.setGoalHud(count, run.goalTicks);
 
-  if (run.goalTicks >= GOAL_TICKS) endRun('win');
-  else if (count === 0)            endRun('lose');
+  if (run.goalTicks >= GOAL_TICKS)         endRun('win');
+  else if (world.endangered[run.baseId] >= 4) endRun('lose');
 }
 
 // ── loop ──────────────────────────────────────────────────────────────────────

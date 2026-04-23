@@ -124,18 +124,30 @@ export const NICHE_BLURBS = {
   5: 'Parasite. Drains living hosts.',
 };
 export const GOAL_COUNT          = 10;
-export const GOAL_TICKS          = 60 * 60;   // 60 seconds at 60 FPS
+export const GOAL_TICKS          = 30 * 60;   // 30 seconds at 60 FPS
 export const FOUNDER_COUNT       = 5;
 export const STARTING_GENE_BUDGET = 10;
 export const WIN_GENE_BONUS      = 5;
 
+// Endangered-status recovery thresholds. A flagged species clears its flag
+// after sustaining strictly more than ENDANGERED_RECOVERY_COUNT individuals
+// for ENDANGERED_RECOVERY_TICKS consecutive ticks.
+export const ENDANGERED_RECOVERY_COUNT = 10;   // must hold > 10
+export const ENDANGERED_RECOVERY_TICKS = 60 * 60;   // 60 seconds at 60 FPS
+// Individuals spawned each time a species crosses into a worse endangered
+// tier (vulnerable / endangered / critically endangered).
+export const ENDANGERED_RESCUE_SPAWN   = 2;
+export const ENDANGERED_LABELS = [
+  '', 'vulnerable', 'endangered', 'critically endangered', 'extinct',
+];
+
 // Gene picker: which attributes are editable per base species.
 // Universal genes apply to everyone; niche-specific ones layer on top.
-export const UNIVERSAL_GENES = ['baseSpeed', 'baseSize', 'splitAt', 'metabolismMult'];
+export const UNIVERSAL_GENES = ['baseSpeed', 'baseSize', 'splitAt', 'metabolismMult', 'fleeThresh', 'maxAge'];
 export const NICHE_GENES = {
   0: ['photoRate'],
   1: ['preyRatio', 'huntEnergy', 'digestTime'],
-  2: ['venomDuration', 'venomDmg', 'venomGain'],
+  2: ['venomDuration', 'venomDmg', 'venomGain', 'stingCooldown'],
   3: ['preyRatio', 'huntEnergy', 'digestTime'],
   4: [],
   5: ['drainRate'],
@@ -150,6 +162,8 @@ export const GENE_COSTS = {
   baseSize:       { step: 0.5,  dir: +1 },
   splitAt:        { step: 10,   dir: -1 },  // lower split threshold is better
   metabolismMult: { step: 0.1,  dir: -1 },  // lower metabolism is better
+  fleeThresh:     { step: 0.1,  dir: -1 },  // lower = skittish (safer), costs points
+  maxAge:         { step: 300,  dir: +1 },  // longer lifespan costs points
   photoRate:      { step: 0.05, dir: +1 },
   preyRatio:      { step: 0.1,  dir: +1 },
   huntEnergy:     { step: 50,   dir: +1 },
@@ -158,4 +172,5 @@ export const GENE_COSTS = {
   venomDuration:  { step: 20,   dir: +1 },
   venomDmg:       { step: 0.1,  dir: +1 },
   venomGain:      { step: 2,    dir: +1 },
+  stingCooldown:  { step: 10,   dir: -1 },  // shorter cooldown is better
 };

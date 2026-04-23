@@ -5,7 +5,7 @@
 import { GameState, totalGeneCost } from './gamestate.js';
 import {
   SPECIES, NICHE_NAMES, NICHE_BLURBS, STARTER_BASE_ID, UNLOCKABLE_BASE_IDS,
-  UNIVERSAL_GENES, NICHE_GENES, GENE_COSTS,
+  UNIVERSAL_GENES, NICHE_GENES, GENE_COSTS, GOAL_COUNT, GOAL_TICKS,
 } from './config.js';
 
 function el(tag, attrs = {}, ...children) {
@@ -218,13 +218,14 @@ export class Menu {
     const span = cfg.step * 10;
     let min = defaultValue - span;
     let max = defaultValue + span;
-    if (['photoRate','preyRatio','digestTime','drainRate','venomDuration','venomDmg','venomGain','huntEnergy'].includes(key)) {
+    if (['photoRate','preyRatio','digestTime','drainRate','venomDuration','venomDmg','venomGain','huntEnergy','stingCooldown','maxAge'].includes(key)) {
       min = Math.max(0, min);
     }
     if (key === 'baseSize')  min = Math.max(0.5, min);
     if (key === 'baseSpeed') min = Math.max(0.1, min);
     if (key === 'splitAt')   min = Math.max(30, min);
     if (key === 'metabolismMult') min = Math.max(0.2, min);
+    if (key === 'fleeThresh') { min = Math.max(1.0, min); max = Math.min(4.0, max); }
 
     const val = el('span', { class: 'gene-val' }, String(state.genes[key]));
     const cost = el('span', { class: 'gene-cost' }, '');
@@ -265,7 +266,7 @@ export class Menu {
     const panel = el('div', { class: 'menu-panel center' },
       el('h1', { class: 'menu-title win' }, 'ESTABLISHED'),
       el('div', { class: 'menu-sub' },
-        `${v ? v.name : 'Your species'} reached 10 alive for 60 seconds.`,
+        `${v ? v.name : 'Your species'} reached ${GOAL_COUNT} alive for ${(GOAL_TICKS / 60) | 0} seconds.`,
       ),
       firstTime
         ? el('div', { class: 'win-bonus' }, `+5 gene points (budget: ${newBudget})`)
