@@ -31,27 +31,32 @@ export class World {
     this.recoveryTicks  = new Array(SPECIES.length).fill(0);
     this._everAlive     = new Array(SPECIES.length).fill(false);
 
-    // Per-species count of organisms queued for silent edge despawn.
-    this.despawnQueue = new Array(SPECIES.length).fill(0);
-  }
-
-  // Population minus organisms already committed to edge-despawn, used to
-  // prevent over-queuing at the pop cap.
-  get effectivePop() {
-    let queued = 0;
-    for (const n of this.despawnQueue) queued += n;
-    return this.orgs.length - queued;
+    // Per-species count of births queued at the pop cap; each natural death
+    // fires one pending birth from the edge, keeping population at maxPop.
+    this.splitQueue = new Array(SPECIES.length).fill(0);
   }
 
   spawnOrg(x, y, parentDNA, forcedSpeciesId) {
     return spawnOrgFactory(this, x, y, parentDNA, forcedSpeciesId);
   }
 
+  // Called whenever any organism dies; fires one queued birth from the edge
+  // so population stays at maxPop rather than sagging after each death.
+  _onDeath() {
+    let best = -1, bestCount = 0;
+    for (let i = 0; i < this.splitQueue.length; i++) {
+      if (this.splitQueue[i] > bestCount) { bestCount = this.splitQueue[i]; best = i; }
+    }
+    if (best === -1) return;
+    this.splitQueue[best]--;
+    this.orgs.push(this.spawnAtEdge(best));
+  }
+
   // Spawn an organism of species spId at a random position along one of the
   // four off-screen edges, with velocity pointing inward.
   spawnAtEdge(spId) {
     const { gw, gh } = this;
-    const B = 40; // off-screen border width (matches M in organism._move)
+    const B = Math.round(Math.max(gw, gh) * 0.05); // 5% of world, matches _move M
     const edge = Math.floor(Math.random() * 4);
     let x, y, vx, vy;
     const spd = 1.2 + Math.random() * 0.8;

@@ -128,6 +128,7 @@ export class Organism {
     this.energy += prey.energy * 0.8;
     this.digestTimer = this.sp.digestTime ?? 0;
     this.world.particles.spawn(prey.x, prey.y, prey.dna.color, 6);
+    this.world._onDeath();
   }
 
   _eatFood(food) {
@@ -140,15 +141,6 @@ export class Organism {
   update(neighbors) {
     if (this.dead) return;
     const sp = this.sp;
-
-    // Silent edge despawn: if queued for removal and currently off-screen, vanish.
-    const { gw, gh } = this.world;
-    if (this.world.despawnQueue[this.dna.speciesId] > 0 &&
-        (this.x < 0 || this.x > gw || this.y < 0 || this.y > gh)) {
-      this.world.despawnQueue[this.dna.speciesId]--;
-      this.dead = true;
-      return;
-    }
 
     this.age++;
     if (this.age >= this.maxAge) { this.die(); return; }
@@ -193,9 +185,9 @@ export class Organism {
     if (vel > spd) { this.vx *= spd / vel; this.vy *= spd / vel; }
     this.x += this.vx; this.y += this.vy;
     const { gw, gh } = this.world;
-    // Wrap with an off-screen margin so organisms slip past the edge before
-    // re-emerging, and so edge-spawned organisms drift in naturally.
-    const M = 40;
+    // Off-screen buffer: 5% of the larger world dimension, so edge-spawned
+    // organisms have a genuine invisible runway before entering the visible area.
+    const M = Math.round(Math.max(gw, gh) * 0.05);
     if (this.x > gw + M) this.x -= gw + M * 2;
     else if (this.x < -M) this.x += gw + M * 2;
     if (this.y > gh + M) this.y -= gh + M * 2;
@@ -205,6 +197,13 @@ export class Organism {
   _split() {
     this.energy *= 0.5;
     this.world.generation = Math.max(this.world.generation, this.gen + 1);
+
+    if (this.world.orgs.length >= this.world.maxPop) {
+      // At cap — queue this birth; it fires from the edge when a slot opens.
+      this.world.splitQueue[this.dna.speciesId]++;
+      return;
+    }
+
     const child = this.world.spawnOrg(
       this.x + (Math.random() - 0.5) * 4,
       this.y + (Math.random() - 0.5) * 4,
@@ -213,14 +212,6 @@ export class Organism {
     child.gen    = this.gen + 1;
     child.energy = this.energy;
     this.world.orgs.push(child);
-
-    if (this.world.effectivePop > this.world.maxPop) {
-      const counts = new Array(SPECIES.length).fill(0);
-      for (const o of this.world.orgs) if (!o.dead) counts[o.dna.speciesId]++;
-      const mostPop = counts.indexOf(Math.max(...counts));
-      this.world.despawnQueue[mostPop]++;
-    }
-
     this.world.particles.spawn(this.x, this.y, this.dna.color, 3);
   }
 
@@ -234,6 +225,7 @@ export class Organism {
         this.y + (Math.random() - 0.5) * 4,
         10,
       );
+    this.world._onDeath();
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
