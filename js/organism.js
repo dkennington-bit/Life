@@ -141,6 +141,15 @@ export class Organism {
     if (this.dead) return;
     const sp = this.sp;
 
+    // Silent edge despawn: if queued for removal and currently off-screen, vanish.
+    const { gw, gh } = this.world;
+    if (this.world.despawnQueue[this.dna.speciesId] > 0 &&
+        (this.x < 0 || this.x > gw || this.y < 0 || this.y > gh)) {
+      this.world.despawnQueue[this.dna.speciesId]--;
+      this.dead = true;
+      return;
+    }
+
     this.age++;
     if (this.age >= this.maxAge) { this.die(); return; }
     if (this.digestTimer   > 0) this.digestTimer--;
@@ -184,9 +193,9 @@ export class Organism {
     if (vel > spd) { this.vx *= spd / vel; this.vy *= spd / vel; }
     this.x += this.vx; this.y += this.vy;
     const { gw, gh } = this.world;
-    // Wrap with a small off-screen margin so organisms slip past the edge
-    // before re-emerging, avoiding a hard teleport at the visible boundary.
-    const M = 10;
+    // Wrap with an off-screen margin so organisms slip past the edge before
+    // re-emerging, and so edge-spawned organisms drift in naturally.
+    const M = 40;
     if (this.x > gw + M) this.x -= gw + M * 2;
     else if (this.x < -M) this.x += gw + M * 2;
     if (this.y > gh + M) this.y -= gh + M * 2;
@@ -205,17 +214,11 @@ export class Organism {
     child.energy = this.energy;
     this.world.orgs.push(child);
 
-    if (this.world.orgs.length > this.world.maxPop) {
+    if (this.world.effectivePop > this.world.maxPop) {
       const counts = new Array(SPECIES.length).fill(0);
       for (const o of this.world.orgs) if (!o.dead) counts[o.dna.speciesId]++;
       const mostPop = counts.indexOf(Math.max(...counts));
-      const splittingSpId = this.dna.speciesId;
-      const candidates = this.world.orgs.filter(o =>
-        !o.dead && o !== child &&
-        (o.dna.speciesId === mostPop || o.dna.speciesId === splittingSpId)
-      );
-      if (candidates.length > 0)
-        candidates[Math.floor(Math.random() * candidates.length)].dead = true;
+      this.world.despawnQueue[mostPop]++;
     }
 
     this.world.particles.spawn(this.x, this.y, this.dna.color, 3);
