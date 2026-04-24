@@ -260,22 +260,34 @@ export class Menu {
     return { node, input };
   }
 
-  // ── win screen ────────────────────────────────────────────────────────────
-  showWinScreen(worldId, baseId, { firstTime, newBudget }, onDismiss) {
-    const w = GameState.getWorld(worldId);
-    const v = w && w.variants[baseId];
+  // ── evolution event (goal reached — upgrade or start fresh) ──────────────
+  // outcome: { firstTime, newBudget } from GameState.recordWin
+  showEvolutionCards(worldId, baseId, outcome, onPickCard, onNewOrganism) {
+    const [r, g, b] = SPECIES[baseId].color;
+    const cards = dealCards(baseId, 3, new Set());
+
     const panel = el('div', { class: 'menu-panel center' },
-      el('h1', { class: 'menu-title win' }, 'ESTABLISHED'),
-      el('div', { class: 'menu-sub' },
-        `${v ? v.name : 'Your species'} reached ${GOAL_COUNT} alive for ${(GOAL_TICKS / 60) | 0} seconds.`,
+      el('div', { class: 'mid-run-label' }, 'evolution event'),
+      el('div', { class: 'card-header' },
+        el('span', { style: `color:rgb(${r},${g},${b})` }, NICHE_NAMES[baseId]),
       ),
-      firstTime
-        ? el('div', { class: 'win-bonus' }, `+5 gene points (budget: ${newBudget})`)
-        : el('div', { class: 'win-bonus' }, 'already established — no bonus'),
+      outcome.firstTime
+        ? el('div', { class: 'win-bonus' }, `established · +5 gene points`)
+        : null,
       el('button', {
-        class: 'menu-btn primary',
-        onclick: () => { this.hide(); onDismiss(); },
-      }, 'continue'),
+        class: 'menu-btn evolution-new-org',
+        onclick: () => onNewOrganism(),
+      }, '+ new organism'),
+      el('div', { class: 'evolution-divider' }, '— or upgrade —'),
+      el('div', { class: 'card-grid' },
+        ...cards.map(card => el('button', {
+          class: 'card-option',
+          onclick: () => onPickCard(card),
+        },
+          el('div', { class: 'card-title' }, card.title),
+          el('div', { class: 'card-desc' }, card.desc),
+        )),
+      ),
     );
     this._show(panel);
   }

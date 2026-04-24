@@ -25,6 +25,7 @@
     position: fixed; top: 8px; right: 12px;
     font-family: monospace; font-size: 22px; color: #3a3; opacity: 0.7;
     pointer-events: none; text-align: right; line-height: 1.5;
+    z-index: 110;
   }
 
   #era {
@@ -317,6 +318,18 @@
   .mid-run-label {
     font-size: 11px; opacity: 0.55; letter-spacing: 1.5px; margin-bottom: 2px;
     text-transform: uppercase;
+  }
+
+  .evolution-new-org {
+    width: 100%; margin-bottom: 4px;
+    background: rgba(0,30,0,0.85); color: #afa;
+    border: 1px solid rgba(120,220,120,0.45);
+  }
+  .evolution-new-org:hover { background: rgba(0,55,0,0.95); border-color: rgba(160,255,160,0.7); }
+
+  .evolution-divider {
+    font-size: 10px; opacity: 0.35; letter-spacing: 2px;
+    margin: 2px 0 6px; text-transform: uppercase;
   }
 </style>
 </head>
