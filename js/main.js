@@ -105,29 +105,41 @@ function saveRunSnapshot() {
   GameState.saveSnapshot(run.worldId, world.serialize());
 }
 
-function endRun(result) {
+function endRun() {
   if (!run || run.done) return;
   run.done = true;
   gameState = 'menu';
   ui.hideGoalHud();
   document.getElementById('pause-btn').classList.remove('visible');
-
-  // Flag extinction only on the explicit lose path; winning can mean 0 of
-  // target alive (edge case — all died just after the goal), and that's OK.
-  if (result === 'lose') GameState.markExtinct(run.worldId, run.baseId);
-
+  GameState.markExtinct(run.worldId, run.baseId);
   saveRunSnapshot();
+  menu.showLoseScreen(run.worldId, run.baseId, () => {
+    newOrgBtn.classList.add('visible');
+  });
+}
 
-  if (result === 'win') {
-    const outcome = GameState.recordWin(run.worldId, run.baseId);
-    menu.showWinScreen(run.worldId, run.baseId, outcome, () => {
-      newOrgBtn.classList.add('visible');
-    });
-  } else {
-    menu.showLoseScreen(run.worldId, run.baseId, () => {
-      newOrgBtn.classList.add('visible');
-    });
-  }
+function showEvolutionEvent() {
+  const outcome = GameState.recordWin(run.worldId, run.baseId);
+  run.goalTicks = 0;
+  gameState = 'menu';
+  ui.hideGoalHud();
+  document.getElementById('pause-btn').classList.remove('visible');
+
+  menu.showEvolutionCards(run.worldId, run.baseId, outcome,
+    card => {
+      applyCard(run.baseId, card, world.orgs);
+      menu.hide();
+      ui.showGoalHud();
+      document.getElementById('pause-btn').classList.add('visible');
+      gameState = 'running';
+    },
+    () => {
+      run.done = true;
+      saveRunSnapshot();
+      const worldId = run.worldId;
+      menu.showWorldMenu(worldId);
+    },
+  );
 }
 
 function abandonRun(worldId) {
@@ -176,8 +188,8 @@ function tickGoal() {
 
   ui.setGoalHud(count, run.goalTicks);
 
-  if (run.goalTicks >= GOAL_TICKS)         endRun('win');
-  else if (world.endangered[run.baseId] >= 4) endRun('lose');
+  if (run.goalTicks >= GOAL_TICKS)            showEvolutionEvent();
+  else if (world.endangered[run.baseId] >= 4) endRun();
 }
 
 // ── loop ──────────────────────────────────────────────────────────────────────
