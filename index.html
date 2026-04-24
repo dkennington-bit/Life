@@ -134,6 +134,19 @@
   #pause-btn.visible { display: block; }
   #pause-btn:active { background: rgba(0,60,0,0.85); color: #9f9; }
 
+  /* ── new organism button (post-run) ── */
+  #new-org-btn {
+    position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,40,0,0.85);
+    border: 1px solid rgba(120,220,120,0.55); border-radius: 4px;
+    color: #afa; font-size: 11px; font-family: monospace;
+    padding: 8px 16px; letter-spacing: 1.5px; cursor: pointer;
+    z-index: 25; display: none; touch-action: manipulation;
+    white-space: nowrap;
+  }
+  #new-org-btn.visible { display: block; }
+  #new-org-btn:active { background: rgba(0,70,0,0.95); color: #fff; }
+
   /* ── menu overlay ── */
   #menu-root {
     position: fixed; inset: 0; z-index: 100;
@@ -321,6 +334,7 @@
 <div id="legend"></div>
 
 <button id="pause-btn">‹ menu</button>
+<button id="new-org-btn">NEW ORGANISM</button>
 <div id="goal-hud">
   <div id="goal-timer">0.0s</div>
   <div id="goal-sub">0 / 10 — hold for 30s</div>

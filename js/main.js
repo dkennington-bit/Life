@@ -14,6 +14,7 @@ const ctx    = canvas.getContext('2d');
 const SCALE  = 2;
 
 let world, ui, menu;
+const newOrgBtn = document.getElementById('new-org-btn');
 
 // ── game state machine ───────────────────────────────────────────────────────
 // 'menu'    — any overlay visible; world draws but doesn't update.
@@ -41,6 +42,13 @@ ui = new UI(world);
 menu = new Menu({
   onStartRun:    startRun,
   onAbandonRun:  abandonRun,
+});
+
+newOrgBtn.addEventListener('click', () => {
+  const active = GameState.activeWorld();
+  if (!active) { menu.showMainMenu(); return; }
+  newOrgBtn.classList.remove('visible');
+  menu.showWorldMenu(active.id);
 });
 
 // ── run orchestration ────────────────────────────────────────────────────────
@@ -86,6 +94,7 @@ function startRun(worldId, baseId, variant) {
   run = { worldId, baseId, goalTicks: 0, done: false };
   gameState = 'running';
   menu.hide();
+  newOrgBtn.classList.remove('visible');
   ui.showGoalHud();
   ui.setGoalHud(0, 0);
   document.getElementById('pause-btn').classList.add('visible');
@@ -111,9 +120,13 @@ function endRun(result) {
 
   if (result === 'win') {
     const outcome = GameState.recordWin(run.worldId, run.baseId);
-    menu.showWinScreen(run.worldId, run.baseId, outcome);
+    menu.showWinScreen(run.worldId, run.baseId, outcome, () => {
+      newOrgBtn.classList.add('visible');
+    });
   } else {
-    menu.showLoseScreen(run.worldId, run.baseId);
+    menu.showLoseScreen(run.worldId, run.baseId, () => {
+      newOrgBtn.classList.add('visible');
+    });
   }
 }
 
