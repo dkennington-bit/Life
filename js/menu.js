@@ -261,7 +261,7 @@ export class Menu {
   }
 
   // ── win screen ────────────────────────────────────────────────────────────
-  showWinScreen(worldId, baseId, { firstTime, newBudget }) {
+  showWinScreen(worldId, baseId, { firstTime, newBudget }, onDismiss) {
     const w = GameState.getWorld(worldId);
     const v = w && w.variants[baseId];
     const panel = el('div', { class: 'menu-panel center' },
@@ -274,18 +274,14 @@ export class Menu {
         : el('div', { class: 'win-bonus' }, 'already established — no bonus'),
       el('button', {
         class: 'menu-btn primary',
-        onclick: () => this.showGenePicker(worldId, baseId),
-      }, 'continue evolving'),
-      el('button', {
-        class: 'menu-btn',
-        onclick: () => this.showWorldMenu(worldId),
-      }, 'finish run'),
+        onclick: () => { this.hide(); onDismiss(); },
+      }, 'continue'),
     );
     this._show(panel);
   }
 
   // ── lose / extinct ────────────────────────────────────────────────────────
-  showLoseScreen(worldId, baseId) {
+  showLoseScreen(worldId, baseId, onDismiss) {
     const w = GameState.getWorld(worldId);
     const v = w && w.variants[baseId];
     const panel = el('div', { class: 'menu-panel center' },
@@ -295,72 +291,33 @@ export class Menu {
       ),
       el('button', {
         class: 'menu-btn primary',
-        onclick: () => this.showGenePicker(worldId, baseId),
-      }, 'try again'),
-      el('button', {
-        class: 'menu-btn',
-        onclick: () => this.showWorldMenu(worldId),
-      }, 'return to world'),
+        onclick: () => { this.hide(); onDismiss(); },
+      }, 'continue'),
     );
     this._show(panel);
   }
 
-  // ── pre-run card draft (3 rounds × 3 cards) ──────────────────────────────
+  // ── pre-run card draft (single starting card) ────────────────────────────
   showCardDraft(worldId, baseId) {
     const w = GameState.getWorld(worldId);
     if (!w) { this.showMainMenu(); return; }
 
     const [r, g, b] = SPECIES[baseId].color;
-    const chosenCards = [];
-    const pickedIds = new Set();
+    const cards = dealCards(baseId, 3, new Set());
 
-    const doRound = (roundNum) => {
-      const cards = dealCards(baseId, 3, pickedIds);
-
-      const panel = el('div', { class: 'menu-panel' },
-        el('button', { class: 'menu-back', onclick: () => this.showWorldMenu(worldId) }, '‹ back'),
-        el('div', { class: 'card-header' },
-          el('span', { style: `color:rgb(${r},${g},${b})` }, NICHE_NAMES[baseId]),
-          el('span', { class: 'card-round-label' }, `round ${roundNum} of 3`),
-        ),
-        el('div', { class: 'menu-sub' }, 'choose a trait adaptation'),
-        el('div', { class: 'card-grid' },
-          ...cards.map(card => el('button', {
-            class: 'card-option',
-            onclick: () => {
-              chosenCards.push(card);
-              pickedIds.add(card.id);
-              if (roundNum < 3) doRound(roundNum + 1);
-              else showSummary();
-            },
-          },
-            el('div', { class: 'card-title' }, card.title),
-            el('div', { class: 'card-desc' }, card.desc),
-          )),
-        ),
-      );
-      this._show(panel);
-    };
-
-    const showSummary = () => {
-      const defaults = GameState.defaultGenesFor(baseId);
-      const genes = { ...defaults };
-      for (const card of chosenCards) {
-        genes[card.key] = Math.round((genes[card.key] + card.delta) * 10000) / 10000;
-      }
-
-      const panel = el('div', { class: 'menu-panel' },
-        el('button', { class: 'menu-back', onclick: () => this.showWorldMenu(worldId) }, '‹ back'),
-        el('h2', { class: 'menu-title' }, 'YOUR ADAPTATIONS'),
-        el('div', { class: 'card-summary' },
-          ...chosenCards.map(card => el('div', { class: 'card-summary-row' },
-            el('span', { class: 'card-summary-title' }, card.title),
-            el('span', { class: 'card-summary-desc' }, card.desc),
-          )),
-        ),
-        el('button', {
-          class: 'menu-btn primary',
+    const panel = el('div', { class: 'menu-panel' },
+      el('button', { class: 'menu-back', onclick: () => this.showWorldMenu(worldId) }, '‹ back'),
+      el('div', { class: 'card-header' },
+        el('span', { style: `color:rgb(${r},${g},${b})` }, NICHE_NAMES[baseId]),
+      ),
+      el('div', { class: 'menu-sub' }, 'choose a starting adaptation'),
+      el('div', { class: 'card-grid' },
+        ...cards.map(card => el('button', {
+          class: 'card-option',
           onclick: () => {
+            const defaults = GameState.defaultGenesFor(baseId);
+            const genes = { ...defaults };
+            genes[card.key] = Math.round((genes[card.key] + card.delta) * 10000) / 10000;
             const variant = GameState.upsertVariant(worldId, baseId, {
               name: NICHE_NAMES[baseId],
               genes,
@@ -368,12 +325,13 @@ export class Menu {
             this.hide();
             this.cbs.onStartRun(worldId, baseId, variant);
           },
-        }, 'BEGIN RUN'),
-      );
-      this._show(panel);
-    };
-
-    doRound(1);
+        },
+          el('div', { class: 'card-title' }, card.title),
+          el('div', { class: 'card-desc' }, card.desc),
+        )),
+      ),
+    );
+    this._show(panel);
   }
 
   // ── mid-run adaptation event (called every 30s during a run) ─────────────
