@@ -6,6 +6,7 @@ import {
 import { SpatialGrid } from './grid.js';
 import { Particles }   from './particles.js';
 import { spawnOrg as spawnOrgFactory, rehydrateOrg } from './species/index.js';
+import { GATE_THRESHOLD, DECAY_INTERVAL, nextTierFor } from './pressure.js';
 
 export class World {
   constructor(gw, gh) {
@@ -33,6 +34,49 @@ export class World {
 
     // Per-species count of organisms queued for silent edge despawn.
     this.despawnQueue = new Array(SPECIES.length).fill(0);
+
+    // Pressure-driven adaptation state.
+    //   pressureLogs[spId][cause]   = { count, lastDeathTick }
+    //   chosenBranches[spId][cause] = branchId  (locks alternatives at that tier)
+    //   pendingGate                 = { spId, cause } when a picker is queued
+    this.pressureLogs   = SPECIES.map(() => ({}));
+    this.chosenBranches = SPECIES.map(() => ({}));
+    this.pendingGate    = null;
+  }
+
+  // Called from organism death paths whenever a death is attributable to a cause.
+  // Increments the per-species/per-cause counter and queues a gate if the
+  // current tier's threshold is crossed (and no other gate is already pending).
+  recordDeath(spId, cause) {
+    const log = this.pressureLogs[spId];
+    let entry = log[cause];
+    if (!entry) { entry = { count: 0, lastDeathTick: 0 }; log[cause] = entry; }
+    entry.count++;
+    entry.lastDeathTick = this.tick;
+
+    if (this.pendingGate) return;
+    const chosen = this.chosenBranches[spId][cause];
+    const tier   = nextTierFor(cause, spId, chosen);
+    if (tier === 0) return;  // axis exhausted at current tier; no further gates
+    const threshold = GATE_THRESHOLD[cause] * tier;
+    if (entry.count >= threshold) {
+      this.pendingGate = { spId, cause };
+    }
+  }
+
+  // Decay pressure counts that haven't been refreshed by a recent death.
+  // Call once per tick from update().
+  _decayPressure() {
+    for (let s = 0; s < this.pressureLogs.length; s++) {
+      const log = this.pressureLogs[s];
+      for (const cause of Object.keys(log)) {
+        const e = log[cause];
+        if (e.count > 0 && this.tick - e.lastDeathTick > DECAY_INTERVAL) {
+          e.count--;
+          e.lastDeathTick = this.tick;
+        }
+      }
+    }
   }
 
   // Population minus organisms already committed to edge-despawn, used to
@@ -102,6 +146,8 @@ export class World {
       endangered:    this.endangered.slice(),
       recoveryTicks: this.recoveryTicks.slice(),
       everAlive:     this._everAlive.slice(),
+      pressureLogs:   this.pressureLogs.map(o => ({ ...o })),
+      chosenBranches: this.chosenBranches.map(o => ({ ...o })),
       foods: this.foods.map(f => ({ x: f.x, y: f.y, value: f.value })),
       orgs: this.orgs.filter(o => !o.dead).map(o => ({
         spId:          o.dna.speciesId,
@@ -139,6 +185,19 @@ export class World {
     this.endangered    = takeArr(snap.endangered, 0);
     this.recoveryTicks = takeArr(snap.recoveryTicks, 0);
     this._everAlive    = takeArr(snap.everAlive, false);
+
+    const takeObjArr = src => {
+      const out = SPECIES.map(() => ({}));
+      if (Array.isArray(src)) {
+        for (let i = 0; i < Math.min(n, src.length); i++) {
+          if (src[i] && typeof src[i] === 'object') out[i] = { ...src[i] };
+        }
+      }
+      return out;
+    };
+    this.pressureLogs   = takeObjArr(snap.pressureLogs);
+    this.chosenBranches = takeObjArr(snap.chosenBranches);
+    this.pendingGate    = null;
     this.foods = (snap.foods || []).map(f => ({ x: f.x, y: f.y, value: f.value }));
     this.orgs  = (snap.orgs  || []).map(s => rehydrateOrg(this, s));
     // Keep food pool at target density (world may have been saved mid-famine).
@@ -166,6 +225,7 @@ export class World {
       if (this.orgs[i].dead) this.orgs.splice(i, 1);
     }
     this._updateEndangered();
+    this._decayPressure();
     this.particles.update();
   }
 

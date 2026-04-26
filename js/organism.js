@@ -29,6 +29,11 @@ export class Organism {
     this.venomTimer   = 0;
     this.venomDmg     = 0;
     this.stingCooldown = 0;
+    // Death-cause attribution (set at the moment of death; read by die()).
+    this.deathCause   = null;
+    // Last-tick a parasite drained this organism. Used to attribute starvation
+    // deaths to parasitism if the host died shortly after being drained.
+    this.lastDrainTick = -Infinity;
     this._ax = 0;
     this._ay = 0;
     // Newborns start at 40% of genetic target size and grow to full size.
@@ -124,6 +129,9 @@ export class Organism {
 
   // ── actions ───────────────────────────────────────────────────────────────
   _kill(prey) {
+    prey.deathCause = 'predation';
+    // _kill bypasses die() (sets dead=true directly), so report here.
+    this.world.recordDeath(prey.dna.speciesId, 'predation');
     prey.dead = true;
     this.energy += prey.energy * 0.8;
     this.digestTimer = this.sp.digestTime ?? 0;
@@ -151,7 +159,7 @@ export class Organism {
     }
 
     this.age++;
-    if (this.age >= this.maxAge) { this.die(); return; }
+    if (this.age >= this.maxAge) { this.deathCause = 'age'; this.die(); return; }
     if (this.digestTimer   > 0) this.digestTimer--;
     if (this.stingCooldown > 0) this.stingCooldown--;
     if (this.venomTimer    > 0) { this.energy -= this.venomDmg; this.venomTimer--; }
@@ -164,7 +172,14 @@ export class Organism {
     this.energy -= STARVE_BASE * sp.metabolismMult * (1 + this.size * this.size * 0.04);
     if (sp.photoRate > 0) this.energy += sp.photoRate;
 
-    if (this.energy <= 0) { this.die(); return; }
+    if (this.energy <= 0) {
+      // Attribute starvation: venom-active → 'venom'; recently parasite-drained → 'parasite'; else 'starvation'.
+      if (this.venomTimer > 0)                                    this.deathCause = 'venom';
+      else if (this.world.tick - this.lastDrainTick < 60)         this.deathCause = 'parasite';
+      else                                                         this.deathCause = 'starvation';
+      this.die();
+      return;
+    }
 
     if (this.energy > sp.splitAt) this._split();
 
@@ -220,6 +235,9 @@ export class Organism {
       const mostPop = counts.indexOf(Math.max(...counts));
       for (const o of this.world.orgs) {
         if (!o.dead && o.dna.speciesId === mostPop && o !== child) {
+          o.deathCause = 'crowding';
+          // Crowding cull bypasses die() too — report directly.
+          this.world.recordDeath(o.dna.speciesId, 'crowding');
           o.dead = true;
           break;
         }
@@ -231,6 +249,7 @@ export class Organism {
 
   die() {
     this.dead = true;
+    if (this.deathCause) this.world.recordDeath(this.dna.speciesId, this.deathCause);
     this.world.particles.spawn(this.x, this.y, this.dna.color, Math.ceil(this.size * 2));
     const pellets = Math.max(1, Math.floor(this.size));
     for (let i = 0; i < pellets; i++)

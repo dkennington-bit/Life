@@ -2,6 +2,7 @@ import {
   SPECIES, SLIDER_CONFIG, ERAS, GOAL_COUNT, GOAL_TICKS,
   ENDANGERED_LABELS, ENDANGERED_RECOVERY_COUNT, ENDANGERED_RECOVERY_TICKS,
 } from './config.js';
+import { GATE_THRESHOLD, PRESSURE_LABEL, branchById, nextTierFor } from './pressure.js';
 
 export class UI {
   constructor(world) {
@@ -72,10 +73,41 @@ export class UI {
       }
       rows.push(
         `<div class="legend-row" style="color:rgb(${r},${g},${b})">` +
-        `● ${sp.name.toLowerCase()}:${c}${suffix}</div>`,
+        `● ${sp.name.toLowerCase()}:${c}${suffix}` +
+        this._pressureSuffix(sp.id) +
+        `</div>`,
       );
     }
     this._legendEl.innerHTML = rows.join('');
+  }
+
+  // Per-species pressure summary: top pressure cause's progress toward the
+  // next gate (if non-zero), plus a chip per chosen branch on any axis.
+  _pressureSuffix(spId) {
+    if (!this.world.pressureLogs) return '';
+    const log    = this.world.pressureLogs[spId] || {};
+    const chosen = this.world.chosenBranches ? (this.world.chosenBranches[spId] || {}) : {};
+
+    // Find the cause with the highest current count (skip zero).
+    let topCause = null, topCount = 0;
+    for (const c of Object.keys(log)) {
+      if (log[c].count > topCount) { topCount = log[c].count; topCause = c; }
+    }
+
+    let parts = '';
+    if (topCause) {
+      const tier = nextTierFor(topCause, spId, chosen[topCause] || null);
+      if (tier > 0) {
+        const threshold = GATE_THRESHOLD[topCause] * tier;
+        parts += ` <span class="legend-pressure">${PRESSURE_LABEL[topCause]} ${topCount}/${threshold}</span>`;
+      }
+    }
+
+    for (const cause of Object.keys(chosen)) {
+      const b = branchById(cause, chosen[cause]);
+      if (b) parts += ` <span class="legend-branch">${b.title.toLowerCase()}</span>`;
+    }
+    return parts;
   }
 
   _bindToggle() {
