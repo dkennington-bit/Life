@@ -25,6 +25,7 @@ export class ParasiteBehavior extends Organism {
       if (nearHostDist < attachDist) {
         this.host = nearHost;
         nearHost.energy -= sp.drainRate;
+        nearHost.lastDrainTick = this.world.tick;
         this.energy    += sp.drainRate * 0.65;
         nearHost.vx    *= 0.9;
         nearHost.vy    *= 0.9;

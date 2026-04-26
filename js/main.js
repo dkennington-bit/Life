@@ -1,5 +1,6 @@
 import { TICK, SPECIES, GOAL_COUNT, GOAL_TICKS, FOUNDER_COUNT, UNIVERSAL_GENES, NICHE_GENES } from './config.js';
 import { applyCard } from './cards.js';
+import { applyBranch, branchById } from './pressure.js';
 import { World } from './world.js';
 import { UI }    from './ui.js';
 import { Menu }  from './menu.js';
@@ -38,6 +39,7 @@ resize();
 world = new World(canvas.width, canvas.height);
 world.init({ empty: true });
 ui = new UI(world);
+window.__world = world;
 
 menu = new Menu({
   onStartRun:    startRun,
@@ -83,8 +85,22 @@ function startRun(worldId, baseId, variant) {
   // goal timer and prevents stale references.
   world = new World(canvas.width, canvas.height);
   ui.world = world;
+  window.__world = world;
   if (w.snapshot) world.init({ snapshot: w.snapshot });
   else            world.init({ empty: true });
+
+  // Re-apply chosen branches on top of variant genes. applyAllWorldVariants
+  // wrote the variant baseline into SPECIES[]; branch deltas live in the
+  // snapshot's chosenBranches and would otherwise be silently dropped on
+  // reload. Pass null for orgs — rehydrated orgs already carry the post-branch
+  // dna values from the snapshot.
+  for (let s = 0; s < SPECIES.length; s++) {
+    const chosen = world.chosenBranches[s] || {};
+    for (const cause of Object.keys(chosen)) {
+      const b = branchById(cause, chosen[cause]);
+      if (b) applyBranch(s, b, null);
+    }
+  }
   // A new run re-seeds the target species by hand, so its endangered tier
   // resets: the player gets a fresh three-strikes window each run.
   world.endangered[baseId]    = 0;
@@ -153,16 +169,24 @@ function abandonRun(worldId) {
   menu.showWorldMenu(worldId);
 }
 
-// ── mid-run adaptation cards ─────────────────────────────────────────────────
-const CARD_INTERVAL = 30 * 60;  // every 30 s at 60 fps
-
-function showMidRunCards() {
+// ── pressure-driven adaptation ───────────────────────────────────────────────
+// Replaces the old fixed-interval mid-run card draw. A picker fires only when
+// world.recordDeath() crosses a tier threshold for any species/cause.
+function showPressureBranchPicker(spId, cause) {
   gameState = 'menu';
   ui.hideGoalHud();
-  menu.showMidRunCards(run.baseId, card => {
-    applyCard(run.baseId, card, world.orgs);
+  document.getElementById('pause-btn').classList.remove('visible');
+  const chosen = world.chosenBranches[spId][cause] || null;
+  menu.showPressureBranchPicker(spId, cause, chosen, branch => {
+    if (branch) {
+      applyBranch(spId, branch, world.orgs);
+      world.chosenBranches[spId][cause] = branch.id;
+    }
+    // Reset the counter so the next tier needs fresh pressure to fire.
+    if (world.pressureLogs[spId][cause]) world.pressureLogs[spId][cause].count = 0;
     menu.hide();
     ui.showGoalHud();
+    document.getElementById('pause-btn').classList.add('visible');
     gameState = 'running';
   });
 }
@@ -203,9 +227,10 @@ function loop(ts) {
     world.update();
     if (run && !run.done) {
       tickGoal();
-      if (gameState === 'running' && !run.done &&
-          world.tick % CARD_INTERVAL === 0 && world.tick > 0) {
-        showMidRunCards();
+      if (gameState === 'running' && !run.done && world.pendingGate) {
+        const { spId, cause } = world.pendingGate;
+        world.pendingGate = null;
+        showPressureBranchPicker(spId, cause);
       }
     }
   }

@@ -8,6 +8,7 @@ import {
   UNIVERSAL_GENES, NICHE_GENES, GENE_COSTS, GOAL_COUNT, GOAL_TICKS,
 } from './config.js';
 import { dealCards } from './cards.js';
+import { availableBranches, PRESSURE_NARRATIVE, PRESSURE_LABEL } from './pressure.js';
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -367,6 +368,49 @@ export class Menu {
           el('div', { class: 'card-desc' }, card.desc),
         )),
       ),
+    );
+    this._show(panel);
+  }
+
+  // ── pressure-driven adaptation event ─────────────────────────────────────
+  // Triggered when world.recordDeath() crosses a tier threshold for some
+  // (species, cause). Shows the available branches for that pressure axis;
+  // calls onPick(branch) when the player chooses one.
+  //   spId           — base species id under selection pressure
+  //   cause          — one of DEATH_CAUSE values
+  //   chosenBranch   — id of the tier-1 branch already picked (null for tier-1)
+  showPressureBranchPicker(spId, cause, chosenBranch, onPick) {
+    const sp = SPECIES[spId];
+    const [r, g, b] = sp.color;
+    const branches = availableBranches(cause, spId, chosenBranch);
+    const tierLabel = chosenBranch ? 'tier 2' : 'tier 1';
+
+    const cards = branches.length > 0
+      ? el('div', { class: 'card-grid' },
+          ...branches.map(branch => el('button', {
+            class: 'card-option',
+            onclick: () => onPick(branch),
+          },
+            el('div', { class: 'card-title' }, branch.title),
+            el('div', { class: 'card-desc' }, branch.desc),
+          )),
+        )
+      : el('div', { class: 'menu-sub' }, 'no further adaptations available on this axis');
+
+    const dismiss = branches.length === 0
+      ? el('button', { class: 'menu-btn primary', onclick: () => onPick(null) }, 'continue')
+      : null;
+
+    const panel = el('div', { class: 'menu-panel center' },
+      el('div', { class: 'mid-run-label' }, `selection pressure · ${PRESSURE_LABEL[cause]} · ${tierLabel}`),
+      el('div', { class: 'card-header' },
+        el('span', { style: `color:rgb(${r},${g},${b})` }, sp.name.toLowerCase()),
+      ),
+      el('div', { class: 'menu-sub' },
+        `${sp.name.toLowerCase()} ${PRESSURE_NARRATIVE[cause]}`,
+      ),
+      cards,
+      dismiss,
     );
     this._show(panel);
   }
